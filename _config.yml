@@ -65,7 +65,7 @@ prismjs:
 # order_by: Posts order. (Order by date descending by default)
 index_generator:
   path: ''
-  per_page: 30
+  per_page: 10
   order_by: -date
 
 # Category & Tag
@@ -140,7 +140,7 @@ theme: hipaper # ブログっぽくてよし
 sitemap:
   path: sitemap.xml
   tag: true
-  category: false
+  category: true
 
 # Deployment
 ## Docs: https://hexo.io/docs/one-command-deployment
@@ -148,7 +148,7 @@ deploy:
   type: git
   repo: git@github.com:tsupox/tsupox-blog.github.io.git
   branch: gh-pages
-  message: update
+  message: "Site updated: {{ now('YYYY-MM-DD HH:mm:ss') }}"
 
 
 
