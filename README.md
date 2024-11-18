@@ -11,7 +11,7 @@ npm install -g hexo
 ```
 npm init
 npm i -S hexo-generator-json-content
-npm install --save @fancyapps/ui
+npm install hexo-deployer-git --save
 ```
 
 ```
