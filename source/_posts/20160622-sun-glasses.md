@@ -1,7 +1,7 @@
 ---
 title: 2016/6/22 今日の自分劇場 - サングラス
 date: 2016-06-22 23:30:00
-updated: 2024-11-18 23:30:00
+updated: 2024-11-19 20:40:00
 category:
   - 日記
   - 2016年
@@ -14,7 +14,7 @@ cover_index: /images/2016-rakugaki/20160622_todays-me-sun-glasses.png
 sitemap: true
 ---
 
-2016/6/22 の日記。 (2024/11/18 記事化)
+2016/6/22 の日記。 (2024/11/19 記事化)
 
 ![](/images/2016-rakugaki/20160622_todays-me-sun-glasses.png)
 
