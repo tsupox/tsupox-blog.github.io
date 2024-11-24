@@ -1,7 +1,7 @@
 ---
 title: 2016/6/29 今日の自分劇場 - 竹馬名人
 date: 2016-06-29 23:30:00
-updated: 2024-11-18 23:30:00
+updated: 2024-11-23 18:00:00
 category:
   - 日記
   - 2016年
@@ -14,7 +14,7 @@ cover_index: /images/2016-rakugaki/20160629_todays-me-takeuma-master.png
 sitemap: true
 ---
 
-2016/6/29 の日記。 (2024/11/18 記事化)
+2016/6/29 の日記。 (2024/11/23 記事化)
 
 ![](/images/2016-rakugaki/20160629_todays-me-takeuma-master.png)
 

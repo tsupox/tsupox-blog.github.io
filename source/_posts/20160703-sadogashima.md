@@ -1,7 +1,7 @@
 ---
 title: 2016/7/3 今日の 母 劇場 - 佐渡島
-date: 2016-07-03 23:30:00
-updated: 2024-11-18 23:30:00
+date: 2016-07-03 23:40:00
+updated: 2024-11-23 23:40:00
 category:
   - 日記
   - 2016年
@@ -14,7 +14,7 @@ cover_index: /images/2016-rakugaki/20160703_todays-mother-sadogashima.png
 sitemap: true
 ---
 
-2016/7/3 の日記。 (2024/11/18 記事化)
+2016/7/3 の日記。 (2024/11/23 記事化)
 
 ![](/images/2016-rakugaki/20160703_todays-mother-sadogashima.png)
 
