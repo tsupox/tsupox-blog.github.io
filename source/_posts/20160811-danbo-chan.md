@@ -1,7 +1,7 @@
 ---
 title: 2016/8/11 ダンボーちゃん
 date: 2016-08-11 23:30:00
-updated: 2024-12-11 19:00:00
+updated: 2024-12-27 21:00:00
 category:
   - 日記
   - 2016年
@@ -14,7 +14,7 @@ cover_index: /images/2016-rakugaki/20160811_todays-mother-danbo-chan.png
 sitemap: true
 ---
 
-2016/8/11 に書いたもの。 (2024/12/11 記事化)
+2016/8/11 に書いたもの。 (2024/12/27 記事化)
 
 ![](/images/2016-rakugaki/20160811_todays-mother-danbo-chan.png)
 
