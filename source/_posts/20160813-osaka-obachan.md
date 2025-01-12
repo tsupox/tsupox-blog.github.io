@@ -1,7 +1,7 @@
 ---
 title: 2016/8/13 大阪のおばちゃん
 date: 2016-08-13 23:30:00
-updated: 2024-12-13 19:00:00
+updated: 2025-01-11 14:00:00
 category:
   - 日記
   - 2016年
@@ -14,7 +14,7 @@ cover_index: /images/2016-rakugaki/20160813_todays-me-osaka-obachan.png
 sitemap: true
 ---
 
-2016/8/13 に書いたもの。 (2024/12/12 記事化)
+2016/8/13 に書いたもの。 (2025/1/10 記事化)
 
 ![](/images/2016-rakugaki/20160813_todays-me-osaka-obachan.png)
 
