@@ -1,7 +1,7 @@
 ---
 title: 2016/9/17 今日の つぽ 劇場 - 長生きの秘訣
 date: 2016-09-17 23:30:00
-updated: 2024-12-12 23:30:00
+updated: 2025-01-18 18:00:00
 category:
   - 日記
   - 2016年
@@ -16,7 +16,7 @@ cover_index: /images/2016-rakugaki/20160917_todays-me-secret-of-long-life.png
 sitemap: true
 ---
 
-2016/9/17 の日記。 (2024/12/20 記事化)
+2016/9/17 の日記。 (2025/1/18 記事化)
 
 ![](/images/2016-rakugaki/20160917_todays-me-secret-of-long-life.png)
 
