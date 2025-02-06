@@ -1,7 +1,7 @@
 ---
 title: 2017/7/17 今日の つぽ 劇場 - ふた割れた
 date: 2017-07-17 23:30:00
-updated: 2025-01-12 23:30:00
+updated: 2025-01-25 18:30:00
 category:
   - 日記
   - 2017年
@@ -13,7 +13,7 @@ cover_index: /images/2017-rakugaki/20170717-me-futa-wareta.jpg
 sitemap: true
 ---
 
-2017/7/17 の日記。 (2025/1/12 記事化)
+2017/7/17 の日記。 (2025/1/25 記事化)
 
 ![](/images/2017-rakugaki/20170717-me-futa-wareta.jpg)
 

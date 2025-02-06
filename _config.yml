@@ -148,7 +148,7 @@ deploy:
   type: git
   repo: git@github.com:tsupox/tsupox-blog.github.io.git
   branch: gh-pages
-  message: "Site updated: {{ now('YYYY-MM-dd HH:mm:ss') }}"
+  message: "Site updated: {{ now('yyyy-MM-dd HH:mm:ss') }}"
 
 
 
