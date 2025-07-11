@@ -7,7 +7,7 @@ category:
   - 2017年
 tags:
   - お絵かき
-  - ねこ劇場
+  - ねこ劇場？
   - 今日のつぽ劇場
 cover_index: /images/2017-rakugaki/20170326_first_mercari.png
 # cover_detail: /images/2017-rakugaki/20170326_first_mercari.png
@@ -21,6 +21,13 @@ sitemap: true
 おまたせしました。
 ようやく 2017 年のイラストを再開します。ここから 2017 年分です。
 半年ぐらい更新停止しちゃってた。
+
+---
+＜画像内コメント＞
+初のメルカリ出品
+
+出品して5分でコメントもなく購入され
+そこから2時間ずっとやりとり…
 
 ---
 
