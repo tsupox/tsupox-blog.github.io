@@ -1,0 +1,25 @@
+{
+  "functions": {
+    "src/index.ts": {
+      "runtime": "@vercel/node@18"
+    }
+  },
+  "routes": [
+    {
+      "src": "/webhook",
+      "dest": "/src/index.ts"
+    },
+    {
+      "src": "/health",
+      "dest": "/src/index.ts"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "build": {
+    "env": {
+      "NODE_ENV": "production"
+    }
+  }
+}
