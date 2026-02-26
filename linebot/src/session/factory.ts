@@ -18,8 +18,11 @@ export function createSessionStorage(config: Config): SessionStorage {
     throw new Error('Table name is required for DynamoDB storage');
   }
 
+  // Use APP_AWS_REGION environment variable (set by CloudFormation)
+  const region = process.env.APP_AWS_REGION || process.env.AWS_REGION || 'ap-northeast-1';
+
   return new DynamoDBSessionStorage(
     config.storage.tableName,
-    process.env.S3_AWS_REGION || 'us-east-1'
+    region
   );
 }

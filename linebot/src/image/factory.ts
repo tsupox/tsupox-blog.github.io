@@ -15,8 +15,11 @@ export function createImageProcessor(config: Config): ImageProcessor {
     throw new Error('S3 bucket name is required for S3 image storage');
   }
 
+  // Use APP_AWS_REGION environment variable (set by CloudFormation)
+  const region = process.env.APP_AWS_REGION || process.env.AWS_REGION || config.imageStorage.region || 'ap-northeast-1';
+
   return new S3ImageProcessor(
     config.imageStorage.bucketName,
-    config.imageStorage.region
+    region
   );
 }

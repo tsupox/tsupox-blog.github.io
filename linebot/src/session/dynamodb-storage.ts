@@ -11,8 +11,11 @@ export class DynamoDBSessionStorage implements SessionStorage {
   private client: DynamoDBDocumentClient;
   private tableName: string;
 
-  constructor(tableName: string, region: string = 'us-east-1') {
-    const dynamoClient = new DynamoDBClient({ region });
+  constructor(tableName: string, region?: string) {
+    const dynamoRegion = region || process.env.APP_AWS_REGION || process.env.AWS_REGION || 'ap-northeast-1';
+    console.log(`Initializing DynamoDB client with region: ${dynamoRegion}, table: ${tableName}`);
+
+    const dynamoClient = new DynamoDBClient({ region: dynamoRegion });
     this.client = DynamoDBDocumentClient.from(dynamoClient);
     this.tableName = tableName;
   }

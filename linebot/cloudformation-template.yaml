@@ -1,6 +1,30 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'LINE Bot Blog Publisher - Serverless infrastructure for automated blog posting via LINE'
 
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Project Configuration"
+        Parameters:
+          - ProjectName
+      - Label:
+          default: "LINE Bot Configuration"
+        Parameters:
+          - LineChannelSecret
+          - LineChannelAccessToken
+      - Label:
+          default: "GitHub Configuration"
+        Parameters:
+          - GitHubToken
+          - GitHubOwner
+          - GitHubRepo
+      - Label:
+          default: "Blog Configuration"
+        Parameters:
+          - BlogBaseUrl
+          - BlogImageBasePath
+
 Parameters:
   ProjectName:
     Type: String
@@ -145,6 +169,7 @@ Resources:
           BLOG_IMAGE_BASE_PATH: !Ref BlogImageBasePath
           DYNAMODB_TABLE_NAME: !Ref SessionTable
           S3_BUCKET_NAME: !Ref ImageBucket
+          APP_AWS_REGION: !Ref AWS::Region
           NODE_ENV: production
       Code:
         ZipFile: |
@@ -253,5 +278,18 @@ Outputs:
   ApiGatewayId:
     Description: API Gateway ID
     Value: !Ref ApiGateway
+    Export:
+      Name: !Sub '${ProjectName}-api-id'
+
+# Stack-level tags that will be propagated to all resources
+Tags:
+  - Key: auto-delete
+    Value: "no"
+  - Key: Project
+    Value: !Ref ProjectName
+  - Key: ManagedBy
+    Value: CloudFormation
+  - Key: Environment
+    Value: production
     Export:
       Name: !Sub '${ProjectName}-api-id'

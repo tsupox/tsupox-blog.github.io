@@ -11,10 +11,11 @@ export class S3ImageProcessor extends BaseImageProcessor {
   private bucketName: string;
   private region: string;
 
-  constructor(bucketName: string, region: string = 'us-east-1') {
+  constructor(bucketName: string, region?: string) {
     super();
     this.bucketName = bucketName;
-    this.region = region;
+    this.region = region || process.env.APP_AWS_REGION || process.env.AWS_REGION || 'ap-northeast-1';
+    console.log(`Initializing S3 client with region: ${this.region}, bucket: ${bucketName}`);
   }
 
   /**
