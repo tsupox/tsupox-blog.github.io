@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "build:lambda": "npm run build && npm run package:lambda",
+    "build:lambda": "npm install --platform=linux --arch=x64 sharp && npm run build && npm run package:lambda",
     "package:lambda": "cd dist && zip -r ../lambda-deployment.zip . && cd .. && zip -r lambda-deployment.zip node_modules",
     "deploy": "bash deploy.sh",
     "deploy:windows": "powershell -ExecutionPolicy Bypass -File deploy.ps1",
@@ -43,6 +43,9 @@
     "typescript": "^5.3.3"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
+  },
+  "optionalDependencies": {
+    "@img/sharp-linux-x64": "^0.33.2"
   }
 }

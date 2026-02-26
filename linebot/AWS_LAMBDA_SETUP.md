@@ -1,12 +1,14 @@
-# AWS Lambda セットアップガイド
+# AWS Lambda セットアップガイド（手動セットアップ）
 
-LINE Bot Blog PublisherをAWS Lambdaにデプロイする手順です。
+LINE Bot Blog PublisherをAWS Lambdaに**手動で**デプロイする手順です。
+
+**注意**: CloudFormationを使った自動セットアップを推奨します。詳細は [CLOUDFORMATION_DEPLOY.md](./CLOUDFORMATION_DEPLOY.md) を参照してください。
 
 ## 前提条件
 
 - AWSアカウント
 - AWS CLI インストール済み（`aws configure`で認証情報設定済み）
-- Node.js 18以上
+- Node.js 20以上（**Node.js 18は非推奨**）
 - LINE Bot設定完了（Channel Secret、Access Token取得済み）
 - GitHub Personal Access Token取得済み
 
@@ -148,12 +150,24 @@ Lambda関数用のIAMロールを作成します。
 ```bash
 cd linebot
 
+# 依存関係のインストール
+npm install
+
+# sharpをLinux x64用にインストール（重要！）
+npm install --platform=linux --arch=x64 sharp
+
 # ビルド
 npm run build
 
 # デプロイパッケージ作成（Windows PowerShell）
 Compress-Archive -Path dist\*,node_modules -DestinationPath lambda-deployment.zip -Force
+
+# または（Linux/Mac）
+cd dist && zip -r ../lambda-deployment.zip . && cd ..
+zip -r lambda-deployment.zip node_modules
 ```
+
+**重要**: `sharp`ライブラリはネイティブバイナリを含むため、Lambda（Linux x64）用に明示的にインストールする必要があります。
 
 ### AWS Management Consoleから作成
 
@@ -161,7 +175,7 @@ Compress-Archive -Path dist\*,node_modules -DestinationPath lambda-deployment.zi
 2. 「関数の作成」をクリック
 3. 以下を設定：
    - **関数名**: `linebot-webhook`
-   - **ランタイム**: `Node.js 18.x`
+   - **ランタイム**: `Node.js 20.x`
    - **アーキテクチャ**: `x86_64`
    - **実行ロール**: 「既存のロールを使用する」→ `linebot-lambda-role`
 4. 「関数の作成」をクリック
@@ -223,6 +237,39 @@ Lambda関数にHTTPエンドポイントを追加します。
 
 ## トラブルシューティング
 
+### sharpモジュールのエラー
+
+**エラー**: `Could not load the "sharp" module using the linux-x64 runtime`
+
+**原因**: sharpライブラリがWindows/Mac用にインストールされており、Lambda（Linux x64）で動作しない
+
+**解決方法**:
+```bash
+# sharpをLinux x64用に再インストール
+npm install --platform=linux --arch=x64 sharp
+
+# 再ビルド・再パッケージ
+npm run build
+Compress-Archive -Path dist\*,node_modules -DestinationPath lambda-deployment.zip -Force
+
+# Lambda関数の更新
+aws lambda update-function-code \
+  --function-name linebot-webhook \
+  --zip-file fileb://lambda-deployment.zip
+```
+
+### Node.js 18 deprecatedエラー
+
+**エラー**: Lambda関数でNode.js 18が非推奨の警告
+
+**解決方法**: Lambda関数のランタイムをNode.js 20.xに更新してください：
+
+```bash
+aws lambda update-function-configuration \
+  --function-name linebot-webhook \
+  --runtime nodejs20.x
+```
+
 ### Lambda関数のログ確認
 
 ```bash
@@ -260,6 +307,12 @@ AWS無料利用枠内で運用可能です：
 コードを更新した場合：
 
 ```bash
+# 依存関係のインストール
+npm install
+
+# sharpをLinux x64用にインストール
+npm install --platform=linux --arch=x64 sharp
+
 # ビルドとパッケージ作成
 npm run build
 Compress-Archive -Path dist\*,node_modules -DestinationPath lambda-deployment.zip -Force
@@ -268,4 +321,20 @@ Compress-Archive -Path dist\*,node_modules -DestinationPath lambda-deployment.zi
 aws lambda update-function-code \
   --function-name linebot-webhook \
   --zip-file fileb://lambda-deployment.zip
+
+# 更新完了を待機
+aws lambda wait function-updated \
+  --function-name linebot-webhook
 ```
+
+## CloudFormationを使った自動セットアップ
+
+手動セットアップは手間がかかるため、CloudFormationを使った自動セットアップを推奨します。
+
+詳細は [CLOUDFORMATION_DEPLOY.md](./CLOUDFORMATION_DEPLOY.md) を参照してください。
+
+CloudFormationを使用すると：
+- ✅ すべてのAWSリソースを一括作成
+- ✅ 設定ミスを防止
+- ✅ 簡単に削除・再作成可能
+- ✅ インフラのバージョン管理が可能

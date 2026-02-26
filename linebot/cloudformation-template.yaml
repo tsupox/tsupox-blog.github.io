@@ -129,7 +129,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub '${ProjectName}-webhook'
-      Runtime: nodejs18.x
+      Runtime: nodejs20.x
       Handler: lambda.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 30

@@ -44,6 +44,10 @@ echo "✅ Lambda function: $FUNCTION_NAME"
 echo "📦 Installing dependencies..."
 npm install
 
+# Install sharp for Linux (Lambda environment)
+echo "🖼️  Installing sharp for Linux x64..."
+npm install --platform=linux --arch=x64 sharp
+
 # Build TypeScript
 echo "🔨 Building TypeScript..."
 npm run build
