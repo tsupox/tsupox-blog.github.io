@@ -145,7 +145,6 @@ Resources:
           BLOG_IMAGE_BASE_PATH: !Ref BlogImageBasePath
           DYNAMODB_TABLE_NAME: !Ref SessionTable
           S3_BUCKET_NAME: !Ref ImageBucket
-          AWS_REGION: !Ref AWS::Region
           NODE_ENV: production
       Code:
         ZipFile: |

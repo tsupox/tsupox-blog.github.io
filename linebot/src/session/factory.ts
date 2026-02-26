@@ -20,6 +20,6 @@ export function createSessionStorage(config: Config): SessionStorage {
 
   return new DynamoDBSessionStorage(
     config.storage.tableName,
-    process.env.AWS_REGION || 'us-east-1'
+    process.env.S3_AWS_REGION || 'us-east-1'
   );
 }

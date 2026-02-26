@@ -35,13 +35,13 @@ aws dynamodb create-table \
   --attribute-definitions AttributeName=userId,AttributeType=S \
   --key-schema AttributeName=userId,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST \
-  --region us-east-1
+  --region ap-northeast-1
 
 # TTL有効化
 aws dynamodb update-time-to-live \
   --table-name linebot-sessions \
   --time-to-live-specification "Enabled=true, AttributeName=ttl" \
-  --region us-east-1
+  --region ap-northeast-1
 ```
 
 ## 2. S3バケット作成
@@ -54,7 +54,7 @@ aws dynamodb update-time-to-live \
 2. 「バケットを作成」をクリック
 3. 以下を設定：
    - **バケット名**: `linebot-temp-images-<your-unique-id>` (グローバルで一意な名前)
-   - **リージョン**: `us-east-1` (または任意のリージョン)
+   - **リージョン**: `ap-northeast-1` (または任意のリージョン)
    - **パブリックアクセスをすべてブロック**: オン（推奨）
 4. 「バケットを作成」をクリック
 5. 作成したバケットを選択 → 「管理」タブ → 「ライフサイクルルール」
@@ -69,7 +69,7 @@ aws dynamodb update-time-to-live \
 
 ```bash
 # バケット作成
-aws s3 mb s3://linebot-temp-images-<your-unique-id> --region us-east-1
+aws s3 mb s3://linebot-temp-images-<your-unique-id> --region ap-northeast-1
 
 # ライフサイクルポリシー設定
 cat > lifecycle-policy.json << 'EOF'
@@ -122,7 +122,7 @@ Lambda関数用のIAMロールを作成します。
         "dynamodb:DeleteItem",
         "dynamodb:Scan"
       ],
-      "Resource": "arn:aws:dynamodb:us-east-1:*:table/linebot-sessions"
+      "Resource": "arn:aws:dynamodb:ap-northeast-1:*:table/linebot-sessions"
     },
     {
       "Effect": "Allow",
@@ -183,7 +183,7 @@ BLOG_BASE_URL=https://your-blog.com
 BLOG_IMAGE_BASE_PATH=/images
 DYNAMODB_TABLE_NAME=linebot-sessions
 S3_BUCKET_NAME=linebot-temp-images-<your-unique-id>
-AWS_REGION=us-east-1
+S3_AWS_REGION=ap-northeast-1
 NODE_ENV=production
 ```
 
@@ -200,7 +200,7 @@ Lambda関数にHTTPエンドポイントを追加します。
    - **APIタイプ**: `HTTP API`
    - **セキュリティ**: `オープン`
 4. 「追加」をクリック
-5. 作成されたAPI Gatewayのエンドポイント（例: `https://xxxxx.execute-api.us-east-1.amazonaws.com/default/linebot-webhook`）をコピー
+5. 作成されたAPI Gatewayのエンドポイント（例: `https://xxxxx.execute-api.ap-northeast-1.amazonaws.com/default/linebot-webhook`）をコピー
 
 ## 6. LINE Webhook URL設定
 
@@ -209,7 +209,7 @@ Lambda関数にHTTPエンドポイントを追加します。
 3. 「Messaging API」タブを開く
 4. **Webhook URL**に以下を設定：
    ```
-   https://xxxxx.execute-api.us-east-1.amazonaws.com/default/linebot-webhook/webhook
+   https://xxxxx.execute-api.ap-northeast-1.amazonaws.com/default/linebot-webhook/webhook
    ```
    （API GatewayのエンドポイントURL + `/webhook`）
 5. 「検証」をクリックして接続確認

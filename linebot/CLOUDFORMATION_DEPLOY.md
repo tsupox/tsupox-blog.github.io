@@ -73,18 +73,18 @@ aws cloudformation create-stack \
   --template-body file://cloudformation-template.yaml \
   --parameters file://cloudformation-parameters.json \
   --capabilities CAPABILITY_NAMED_IAM \
-  --region us-east-1
+  --region ap-northeast-1
 
 # スタック作成の進行状況を確認
 aws cloudformation describe-stacks \
   --stack-name linebot-blog-publisher \
-  --region us-east-1 \
+  --region ap-northeast-1 \
   --query 'Stacks[0].StackStatus'
 
 # スタック作成完了まで待機
 aws cloudformation wait stack-create-complete \
   --stack-name linebot-blog-publisher \
-  --region us-east-1
+  --region ap-northeast-1
 ```
 
 ### AWS Management Consoleを使用する場合
@@ -109,7 +109,7 @@ aws cloudformation wait stack-create-complete \
 # 出力値を取得
 aws cloudformation describe-stacks \
   --stack-name linebot-blog-publisher \
-  --region us-east-1 \
+  --region ap-northeast-1 \
   --query 'Stacks[0].Outputs'
 ```
 
@@ -118,12 +118,12 @@ aws cloudformation describe-stacks \
 [
   {
     "OutputKey": "WebhookUrl",
-    "OutputValue": "https://xxxxx.execute-api.us-east-1.amazonaws.com/webhook",
+    "OutputValue": "https://xxxxx.execute-api.ap-northeast-1.amazonaws.com/webhook",
     "Description": "LINE Webhook URL (set this in LINE Developers Console)"
   },
   {
     "OutputKey": "HealthCheckUrl",
-    "OutputValue": "https://xxxxx.execute-api.us-east-1.amazonaws.com/health",
+    "OutputValue": "https://xxxxx.execute-api.ap-northeast-1.amazonaws.com/health",
     "Description": "Health check endpoint URL"
   },
   {
@@ -158,7 +158,7 @@ zip -r lambda-deployment.zip node_modules
 # CloudFormationの出力からLambda関数名を取得
 FUNCTION_NAME=$(aws cloudformation describe-stacks \
   --stack-name linebot-blog-publisher \
-  --region us-east-1 \
+  --region ap-northeast-1 \
   --query 'Stacks[0].Outputs[?OutputKey==`LambdaFunctionName`].OutputValue' \
   --output text)
 
@@ -166,12 +166,12 @@ FUNCTION_NAME=$(aws cloudformation describe-stacks \
 aws lambda update-function-code \
   --function-name $FUNCTION_NAME \
   --zip-file fileb://lambda-deployment.zip \
-  --region us-east-1
+  --region ap-northeast-1
 
 # 更新完了まで待機
 aws lambda wait function-updated \
   --function-name $FUNCTION_NAME \
-  --region us-east-1
+  --region ap-northeast-1
 ```
 
 ## 5. LINE Webhook URLの設定
@@ -191,7 +191,7 @@ aws lambda wait function-updated \
 # ヘルスチェックエンドポイントにアクセス
 HEALTH_URL=$(aws cloudformation describe-stacks \
   --stack-name linebot-blog-publisher \
-  --region us-east-1 \
+  --region ap-northeast-1 \
   --query 'Stacks[0].Outputs[?OutputKey==`HealthCheckUrl`].OutputValue' \
   --output text)
 
@@ -230,12 +230,12 @@ aws cloudformation update-stack \
   --template-body file://cloudformation-template.yaml \
   --parameters file://cloudformation-parameters.json \
   --capabilities CAPABILITY_NAMED_IAM \
-  --region us-east-1
+  --region ap-northeast-1
 
 # 更新完了まで待機
 aws cloudformation wait stack-update-complete \
   --stack-name linebot-blog-publisher \
-  --region us-east-1
+  --region ap-northeast-1
 ```
 
 ## スタックの削除
@@ -246,7 +246,7 @@ aws cloudformation wait stack-update-complete \
 # S3バケットを空にする（削除前に必要）
 BUCKET_NAME=$(aws cloudformation describe-stacks \
   --stack-name linebot-blog-publisher \
-  --region us-east-1 \
+  --region ap-northeast-1 \
   --query 'Stacks[0].Outputs[?OutputKey==`S3BucketName`].OutputValue' \
   --output text)
 
@@ -255,12 +255,12 @@ aws s3 rm s3://$BUCKET_NAME --recursive
 # スタックを削除
 aws cloudformation delete-stack \
   --stack-name linebot-blog-publisher \
-  --region us-east-1
+  --region ap-northeast-1
 
 # 削除完了まで待機
 aws cloudformation wait stack-delete-complete \
   --stack-name linebot-blog-publisher \
-  --region us-east-1
+  --region ap-northeast-1
 ```
 
 ## トラブルシューティング
@@ -271,7 +271,7 @@ aws cloudformation wait stack-delete-complete \
 # スタックイベントを確認
 aws cloudformation describe-stack-events \
   --stack-name linebot-blog-publisher \
-  --region us-east-1 \
+  --region ap-northeast-1 \
   --max-items 20
 ```
 
@@ -290,7 +290,7 @@ aws logs tail /aws/lambda/linebot-blog-publisher-webhook \
 # テーブルの内容を確認
 aws dynamodb scan \
   --table-name linebot-blog-publisher-sessions \
-  --region us-east-1
+  --region ap-northeast-1
 ```
 
 ## コスト見積もり
@@ -313,12 +313,12 @@ AWS無料利用枠内で運用可能です：
 # スタックの詳細情報
 aws cloudformation describe-stacks \
   --stack-name linebot-blog-publisher \
-  --region us-east-1
+  --region ap-northeast-1
 
 # スタックのリソース一覧
 aws cloudformation list-stack-resources \
   --stack-name linebot-blog-publisher \
-  --region us-east-1
+  --region ap-northeast-1
 ```
 
 ### Lambda関数の環境変数更新
@@ -328,7 +328,7 @@ aws cloudformation list-stack-resources \
 aws lambda update-function-configuration \
   --function-name linebot-blog-publisher-webhook \
   --environment "Variables={GITHUB_TOKEN=new_token_here,...}" \
-  --region us-east-1
+  --region ap-northeast-1
 ```
 
 ### DynamoDBテーブルのバックアップ
@@ -338,5 +338,5 @@ aws lambda update-function-configuration \
 aws dynamodb create-backup \
   --table-name linebot-blog-publisher-sessions \
   --backup-name linebot-sessions-backup-$(date +%Y%m%d) \
-  --region us-east-1
+  --region ap-northeast-1
 ```

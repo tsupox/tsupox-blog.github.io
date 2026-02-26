@@ -61,7 +61,7 @@ export function loadConfig(): Config {
     imageStorage: {
       type: imageStorageType,
       bucketName: process.env.S3_BUCKET_NAME,
-      region: process.env.AWS_REGION || 'us-east-1',
+      region: process.env.S3_AWS_REGION || 'us-east-1',
     },
   };
 

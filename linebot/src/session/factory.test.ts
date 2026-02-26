@@ -31,9 +31,9 @@ describe('createSessionStorage', () => {
       expect(() => createSessionStorage(config)).toThrow('Table name is required for DynamoDB storage');
     });
 
-    it('should use AWS_REGION from environment', () => {
-      const originalRegion = process.env.AWS_REGION;
-      process.env.AWS_REGION = 'ap-northeast-1';
+    it('should use S3_AWS_REGION from environment', () => {
+      const originalRegion = process.env.S3_AWS_REGION;
+      process.env.S3_AWS_REGION = 'ap-northeast-1';
 
       try {
         const config: Config = {
@@ -48,9 +48,9 @@ describe('createSessionStorage', () => {
         expect(storage).toBeInstanceOf(DynamoDBSessionStorage);
       } finally {
         if (originalRegion !== undefined) {
-          process.env.AWS_REGION = originalRegion;
+          process.env.S3_AWS_REGION = originalRegion;
         } else {
-          delete process.env.AWS_REGION;
+          delete process.env.S3_AWS_REGION;
         }
       }
     });
