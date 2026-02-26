@@ -4,7 +4,6 @@
 
 import { BaseImageProcessor, ImageValidationResult } from './processor';
 import { ValidationError } from '../types';
-import sharp from 'sharp';
 
 // Mock implementation for testing
 class TestImageProcessor extends BaseImageProcessor {

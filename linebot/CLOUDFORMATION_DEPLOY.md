@@ -155,7 +155,6 @@ chmod +x deploy.sh
 
 デプロイスクリプトは以下を自動実行します：
 - 依存関係のインストール
-- **sharpライブラリのLinux x64版インストール**（Lambda環境用）
 - TypeScriptビルド
 - デプロイパッケージ作成
 - Lambda関数への自動デプロイ
@@ -168,9 +167,6 @@ chmod +x deploy.sh
 # 依存関係のインストール
 npm install
 
-# sharpをLinux x64用にインストール（重要！）
-npm install --platform=linux --arch=x64 sharp
-
 # ビルド
 npm run build
 
@@ -181,8 +177,6 @@ Compress-Archive -Path dist\*,node_modules -DestinationPath lambda-deployment.zi
 cd dist && zip -r ../lambda-deployment.zip . && cd ..
 zip -r lambda-deployment.zip node_modules
 ```
-
-**重要**: `sharp`ライブラリはネイティブバイナリを含むため、Lambda（Linux x64）用に明示的にインストールする必要があります。これを行わないと「Could not load the "sharp" module」エラーが発生します。
 
 ### Lambda関数の更新
 
@@ -296,22 +290,6 @@ aws cloudformation wait stack-delete-complete \
 ```
 
 ## トラブルシューティング
-
-### sharpモジュールのエラー
-
-**エラー**: `Could not load the "sharp" module using the linux-x64 runtime`
-
-**原因**: sharpライブラリがWindows/Mac用にインストールされており、Lambda（Linux x64）で動作しない
-
-**解決方法**:
-```bash
-# sharpをLinux x64用に再インストール
-npm install --platform=linux --arch=x64 sharp
-
-# 再ビルド・再デプロイ
-npm run build
-./deploy.sh  # または deploy.ps1
-```
 
 ### Node.js 18 deprecatedエラー
 

@@ -153,9 +153,6 @@ cd linebot
 # 依存関係のインストール
 npm install
 
-# sharpをLinux x64用にインストール（重要！）
-npm install --platform=linux --arch=x64 sharp
-
 # ビルド
 npm run build
 
@@ -166,8 +163,6 @@ Compress-Archive -Path dist\*,node_modules -DestinationPath lambda-deployment.zi
 cd dist && zip -r ../lambda-deployment.zip . && cd ..
 zip -r lambda-deployment.zip node_modules
 ```
-
-**重要**: `sharp`ライブラリはネイティブバイナリを含むため、Lambda（Linux x64）用に明示的にインストールする必要があります。
 
 ### AWS Management Consoleから作成
 
@@ -237,27 +232,6 @@ Lambda関数にHTTPエンドポイントを追加します。
 
 ## トラブルシューティング
 
-### sharpモジュールのエラー
-
-**エラー**: `Could not load the "sharp" module using the linux-x64 runtime`
-
-**原因**: sharpライブラリがWindows/Mac用にインストールされており、Lambda（Linux x64）で動作しない
-
-**解決方法**:
-```bash
-# sharpをLinux x64用に再インストール
-npm install --platform=linux --arch=x64 sharp
-
-# 再ビルド・再パッケージ
-npm run build
-Compress-Archive -Path dist\*,node_modules -DestinationPath lambda-deployment.zip -Force
-
-# Lambda関数の更新
-aws lambda update-function-code \
-  --function-name linebot-webhook \
-  --zip-file fileb://lambda-deployment.zip
-```
-
 ### Node.js 18 deprecatedエラー
 
 **エラー**: Lambda関数でNode.js 18が非推奨の警告
@@ -309,9 +283,6 @@ AWS無料利用枠内で運用可能です：
 ```bash
 # 依存関係のインストール
 npm install
-
-# sharpをLinux x64用にインストール
-npm install --platform=linux --arch=x64 sharp
 
 # ビルドとパッケージ作成
 npm run build

@@ -46,10 +46,6 @@ Write-Host "✅ Lambda function: $FUNCTION_NAME" -ForegroundColor Green
 Write-Host "📦 Installing dependencies..." -ForegroundColor Cyan
 npm install
 
-# Install sharp for Linux (Lambda environment)
-Write-Host "🖼️  Installing sharp for Linux x64..." -ForegroundColor Cyan
-npm install --platform=linux --arch=x64 sharp
-
 # Build TypeScript
 Write-Host "🔨 Building TypeScript..." -ForegroundColor Cyan
 npm run build
