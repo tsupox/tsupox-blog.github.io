@@ -84,6 +84,8 @@ Resources:
           Value: !Ref ProjectName
         - Key: Purpose
           Value: Session Management
+        - Key: auto-delete
+          Value: "no"
 
   # S3 Bucket for temporary image storage
   ImageBucket:
@@ -106,6 +108,8 @@ Resources:
           Value: !Ref ProjectName
         - Key: Purpose
           Value: Temporary Image Storage
+        - Key: auto-delete
+          Value: "no"
 
   # IAM Role for Lambda function
   LambdaExecutionRole:
@@ -147,6 +151,8 @@ Resources:
       Tags:
         - Key: Project
           Value: !Ref ProjectName
+        - Key: auto-delete
+          Value: "no"
 
   # Lambda Function
   WebhookFunction:
@@ -182,6 +188,8 @@ Resources:
       Tags:
         - Key: Project
           Value: !Ref ProjectName
+        - Key: auto-delete
+          Value: "no"
 
   # Lambda Permission for API Gateway
   LambdaInvokePermission:
@@ -201,6 +209,7 @@ Resources:
       Description: API Gateway for LINE Bot webhook
       Tags:
         Project: !Ref ProjectName
+        auto-delete: "no"
 
   # API Gateway Integration
   ApiIntegration:
@@ -236,6 +245,7 @@ Resources:
       AutoDeploy: true
       Tags:
         Project: !Ref ProjectName
+        auto-delete: "no"
 
   # CloudWatch Log Group for Lambda
   LambdaLogGroup:
@@ -278,18 +288,5 @@ Outputs:
   ApiGatewayId:
     Description: API Gateway ID
     Value: !Ref ApiGateway
-    Export:
-      Name: !Sub '${ProjectName}-api-id'
-
-# Stack-level tags that will be propagated to all resources
-Tags:
-  - Key: auto-delete
-    Value: "no"
-  - Key: Project
-    Value: !Ref ProjectName
-  - Key: ManagedBy
-    Value: CloudFormation
-  - Key: Environment
-    Value: production
     Export:
       Name: !Sub '${ProjectName}-api-id'
