@@ -36,6 +36,11 @@ describe('ConversationManager', () => {
         availableTags: ['タグ1', 'タグ2'],
         imageBasePath: '/images',
         categories: ['日記']
+      },
+      imageStorage: {
+        type: 's3',
+        bucketName: 'test-bucket',
+        region: 'us-east-1'
       }
     } as Config;
 

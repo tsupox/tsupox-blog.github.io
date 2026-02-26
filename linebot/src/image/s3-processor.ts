@@ -28,6 +28,7 @@ export class S3ImageProcessor extends BaseImageProcessor {
     try {
       // Dynamic import to avoid requiring AWS SDK if not used
       // Use type assertion to bypass TypeScript checking
+      // @ts-ignore - AWS SDK is optional dependency
       const awsModule = await (import('@aws-sdk/client-s3') as any);
       const { S3Client } = awsModule;
 
@@ -51,6 +52,7 @@ export class S3ImageProcessor extends BaseImageProcessor {
   async uploadToTempStorage(imageBuffer: Buffer, filename: string): Promise<string> {
     try {
       const s3Client = await this.getS3Client();
+      // @ts-ignore - AWS SDK is optional dependency
       const awsModule = await (import('@aws-sdk/client-s3') as any);
       const { PutObjectCommand } = awsModule;
 
@@ -84,6 +86,7 @@ export class S3ImageProcessor extends BaseImageProcessor {
   async downloadFromTempStorage(key: string): Promise<Buffer> {
     try {
       const s3Client = await this.getS3Client();
+      // @ts-ignore - AWS SDK is optional dependency
       const awsModule = await (import('@aws-sdk/client-s3') as any);
       const { GetObjectCommand } = awsModule;
 
@@ -131,6 +134,7 @@ export class S3ImageProcessor extends BaseImageProcessor {
   async cleanupTempStorage(key: string): Promise<void> {
     try {
       const s3Client = await this.getS3Client();
+      // @ts-ignore - AWS SDK is optional dependency
       const awsModule = await (import('@aws-sdk/client-s3') as any);
       const { DeleteObjectCommand } = awsModule;
 
@@ -153,6 +157,7 @@ export class S3ImageProcessor extends BaseImageProcessor {
   async imageExists(key: string): Promise<boolean> {
     try {
       const s3Client = await this.getS3Client();
+      // @ts-ignore - AWS SDK is optional dependency
       const awsModule = await (import('@aws-sdk/client-s3') as any);
       const { HeadObjectCommand } = awsModule;
 

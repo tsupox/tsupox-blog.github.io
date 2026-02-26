@@ -97,14 +97,13 @@ export interface Config {
     availableTags: string[];
   };
   storage: {
-    type: 'dynamodb' | 'vercel-kv';
-    tableName?: string; // For DynamoDB
-    kvUrl?: string; // For Vercel KV
+    type: 'dynamodb';
+    tableName?: string;
   };
   imageStorage: {
-    type: 's3' | 'vercel-blob';
-    bucketName?: string; // For S3
-    region?: string; // For S3
+    type: 's3';
+    bucketName?: string;
+    region?: string;
   };
 }
 
@@ -151,20 +150,4 @@ export interface APIGatewayResponse {
   statusCode: number;
   headers?: Record<string, string>;
   body: string;
-}
-
-// Vercel Function Types (alternative to AWS Lambda)
-export interface VercelRequest {
-  body: string;
-  headers: Record<string, string>;
-  method: string;
-  url: string;
-  query: Record<string, string>;
-}
-
-export interface VercelResponse {
-  status: (code: number) => VercelResponse;
-  json: (object: unknown) => VercelResponse;
-  send: (body: string) => VercelResponse;
-  setHeader: (name: string, value: string) => VercelResponse;
 }

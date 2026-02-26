@@ -1,0 +1,258 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'LINE Bot Blog Publisher - Serverless infrastructure for automated blog posting via LINE'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: linebot-blog-publisher
+    Description: Project name used for resource naming
+
+  LineChannelSecret:
+    Type: String
+    NoEcho: true
+    Description: LINE Bot Channel Secret
+
+  LineChannelAccessToken:
+    Type: String
+    NoEcho: true
+    Description: LINE Bot Channel Access Token
+
+  GitHubToken:
+    Type: String
+    NoEcho: true
+    Description: GitHub Personal Access Token
+
+  GitHubOwner:
+    Type: String
+    Description: GitHub repository owner username
+
+  GitHubRepo:
+    Type: String
+    Description: GitHub repository name
+
+  BlogBaseUrl:
+    Type: String
+    Description: Blog base URL (e.g., https://your-blog.github.io)
+
+  BlogImageBasePath:
+    Type: String
+    Default: /images
+    Description: Base path for blog images
+
+Resources:
+  # DynamoDB Table for session management
+  SessionTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${ProjectName}-sessions'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Purpose
+          Value: Session Management
+
+  # S3 Bucket for temporary image storage
+  ImageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-temp-images-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteTempImagesAfter1Day
+            Status: Enabled
+            Prefix: temp-images/
+            ExpirationInDays: 1
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Purpose
+          Value: Temporary Image Storage
+
+  # IAM Role for Lambda function
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Scan
+                Resource: !GetAtt SessionTable.Arn
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:HeadObject
+                Resource: !Sub '${ImageBucket.Arn}/*'
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # Lambda Function
+  WebhookFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-webhook'
+      Runtime: nodejs18.x
+      Handler: lambda.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 512
+      Environment:
+        Variables:
+          LINE_CHANNEL_SECRET: !Ref LineChannelSecret
+          LINE_CHANNEL_ACCESS_TOKEN: !Ref LineChannelAccessToken
+          GITHUB_TOKEN: !Ref GitHubToken
+          GITHUB_OWNER: !Ref GitHubOwner
+          GITHUB_REPO: !Ref GitHubRepo
+          BLOG_BASE_URL: !Ref BlogBaseUrl
+          BLOG_IMAGE_BASE_PATH: !Ref BlogImageBasePath
+          DYNAMODB_TABLE_NAME: !Ref SessionTable
+          S3_BUCKET_NAME: !Ref ImageBucket
+          AWS_REGION: !Ref AWS::Region
+          NODE_ENV: production
+      Code:
+        ZipFile: |
+          exports.handler = async (event) => {
+            return {
+              statusCode: 200,
+              body: JSON.stringify({ message: 'Please deploy your code' })
+            };
+          };
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # Lambda Permission for API Gateway
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref WebhookFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*'
+
+  # API Gateway HTTP API
+  ApiGateway:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${ProjectName}-api'
+      ProtocolType: HTTP
+      Description: API Gateway for LINE Bot webhook
+      Tags:
+        Project: !Ref ProjectName
+
+  # API Gateway Integration
+  ApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ApiGateway
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt WebhookFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  # API Gateway Route for webhook
+  WebhookRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ApiGateway
+      RouteKey: 'POST /webhook'
+      Target: !Sub 'integrations/${ApiIntegration}'
+
+  # API Gateway Route for health check
+  HealthRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ApiGateway
+      RouteKey: 'GET /health'
+      Target: !Sub 'integrations/${ApiIntegration}'
+
+  # API Gateway Stage
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref ApiGateway
+      StageName: $default
+      AutoDeploy: true
+      Tags:
+        Project: !Ref ProjectName
+
+  # CloudWatch Log Group for Lambda
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${WebhookFunction}'
+      RetentionInDays: 7
+
+Outputs:
+  WebhookUrl:
+    Description: LINE Webhook URL (set this in LINE Developers Console)
+    Value: !Sub 'https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/webhook'
+    Export:
+      Name: !Sub '${ProjectName}-webhook-url'
+
+  HealthCheckUrl:
+    Description: Health check endpoint URL
+    Value: !Sub 'https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/health'
+    Export:
+      Name: !Sub '${ProjectName}-health-url'
+
+  LambdaFunctionName:
+    Description: Lambda function name for code deployment
+    Value: !Ref WebhookFunction
+    Export:
+      Name: !Sub '${ProjectName}-function-name'
+
+  DynamoDBTableName:
+    Description: DynamoDB table name for sessions
+    Value: !Ref SessionTable
+    Export:
+      Name: !Sub '${ProjectName}-table-name'
+
+  S3BucketName:
+    Description: S3 bucket name for temporary images
+    Value: !Ref ImageBucket
+    Export:
+      Name: !Sub '${ProjectName}-bucket-name'
+
+  ApiGatewayId:
+    Description: API Gateway ID
+    Value: !Ref ApiGateway
+    Export:
+      Name: !Sub '${ProjectName}-api-id'

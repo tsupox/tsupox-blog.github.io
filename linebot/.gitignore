@@ -16,6 +16,12 @@ build/
 .env.test.local
 .env.production.local
 
+# CloudFormation parameters (contains secrets)
+cloudformation-parameters.json
+
+# Deployment packages
+lambda-deployment.zip
+
 # IDE
 .vscode/
 .idea/

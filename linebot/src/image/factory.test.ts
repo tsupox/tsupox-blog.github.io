@@ -3,7 +3,6 @@
  */
 
 import { createImageProcessor } from './factory';
-import { VercelBlobImageProcessor } from './vercel-blob-processor';
 import { Config } from '../types';
 
 // Mock S3ImageProcessor to avoid AWS SDK dependency in tests
@@ -19,35 +18,6 @@ jest.mock('./s3-processor', () => ({
 import { S3ImageProcessor } from './s3-processor';
 
 describe('createImageProcessor', () => {
-  it('should create VercelBlobImageProcessor for vercel-blob type', () => {
-    const config: Config = {
-      line: {
-        channelSecret: 'test-secret',
-        channelAccessToken: 'test-token',
-      },
-      github: {
-        token: 'test-github-token',
-        owner: 'test-owner',
-        repo: 'test-repo',
-      },
-      blog: {
-        baseUrl: 'https://test-blog.com',
-        imageBasePath: '/images',
-        categories: ['test'],
-        availableTags: ['tag1', 'tag2'],
-      },
-      storage: {
-        type: 'vercel-kv',
-      },
-      imageStorage: {
-        type: 'vercel-blob',
-      },
-    };
-
-    const processor = createImageProcessor(config);
-    expect(processor).toBeInstanceOf(VercelBlobImageProcessor);
-  });
-
   it('should create S3ImageProcessor for s3 type', () => {
     const config: Config = {
       line: {

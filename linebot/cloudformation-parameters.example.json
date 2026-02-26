@@ -1,0 +1,34 @@
+[
+  {
+    "ParameterKey": "ProjectName",
+    "ParameterValue": "linebot-blog-publisher"
+  },
+  {
+    "ParameterKey": "LineChannelSecret",
+    "ParameterValue": "your_line_channel_secret_here"
+  },
+  {
+    "ParameterKey": "LineChannelAccessToken",
+    "ParameterValue": "your_line_channel_access_token_here"
+  },
+  {
+    "ParameterKey": "GitHubToken",
+    "ParameterValue": "your_github_personal_access_token_here"
+  },
+  {
+    "ParameterKey": "GitHubOwner",
+    "ParameterValue": "your_github_username"
+  },
+  {
+    "ParameterKey": "GitHubRepo",
+    "ParameterValue": "your_blog_repository_name"
+  },
+  {
+    "ParameterKey": "BlogBaseUrl",
+    "ParameterValue": "https://your-blog-domain.com"
+  },
+  {
+    "ParameterKey": "BlogImageBasePath",
+    "ParameterValue": "/images"
+  }
+]

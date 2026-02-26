@@ -23,9 +23,9 @@ export function loadConfig(): Config {
     throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
   }
 
-  // Determine storage type based on environment
-  const storageType = process.env.VERCEL ? 'vercel-kv' : 'dynamodb';
-  const imageStorageType = process.env.VERCEL ? 'vercel-blob' : 's3';
+  // AWS Lambda environment - always use DynamoDB and S3
+  const storageType = 'dynamodb';
+  const imageStorageType = 's3';
 
   const config: Config = {
     line: {
@@ -57,7 +57,6 @@ export function loadConfig(): Config {
     storage: {
       type: storageType,
       tableName: process.env.DYNAMODB_TABLE_NAME,
-      kvUrl: process.env.KV_URL,
     },
     imageStorage: {
       type: imageStorageType,
@@ -67,16 +66,12 @@ export function loadConfig(): Config {
   };
 
   // Validate storage-specific configuration
-  if (config.storage.type === 'dynamodb' && !config.storage.tableName) {
-    throw new Error('DYNAMODB_TABLE_NAME is required when using DynamoDB storage');
+  if (!config.storage.tableName) {
+    throw new Error('DYNAMODB_TABLE_NAME is required');
   }
 
-  if (config.storage.type === 'vercel-kv' && !config.storage.kvUrl) {
-    throw new Error('KV_URL is required when using Vercel KV storage');
-  }
-
-  if (config.imageStorage.type === 's3' && !config.imageStorage.bucketName) {
-    throw new Error('S3_BUCKET_NAME is required when using S3 image storage');
+  if (!config.imageStorage.bucketName) {
+    throw new Error('S3_BUCKET_NAME is required');
   }
 
   return config;
