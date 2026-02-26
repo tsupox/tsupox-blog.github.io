@@ -40,7 +40,14 @@ export class DynamoDBSessionStorage implements SessionStorage {
         return null;
       }
 
-      return response.Item.state as ConversationState;
+      const state = response.Item.state as any;
+
+      // Convert ISO strings back to Date objects
+      return {
+        ...state,
+        createdAt: typeof state.createdAt === 'string' ? new Date(state.createdAt) : state.createdAt,
+        updatedAt: typeof state.updatedAt === 'string' ? new Date(state.updatedAt) : state.updatedAt,
+      };
     } catch (error) {
       console.error('DynamoDB get error:', error);
       throw new Error(`Failed to get session: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -52,11 +59,18 @@ export class DynamoDBSessionStorage implements SessionStorage {
       // Set TTL to 24 hours from now
       const ttl = Math.floor(Date.now() / 1000) + 86400;
 
+      // Convert Date objects to ISO strings for DynamoDB
+      const serializedState = {
+        ...state,
+        createdAt: state.createdAt instanceof Date ? state.createdAt.toISOString() : state.createdAt,
+        updatedAt: state.updatedAt instanceof Date ? state.updatedAt.toISOString() : state.updatedAt,
+      };
+
       const command = new PutCommand({
         TableName: this.tableName,
         Item: {
           userId,
-          state,
+          state: serializedState,
           ttl,
           updatedAt: new Date().toISOString(),
         },
