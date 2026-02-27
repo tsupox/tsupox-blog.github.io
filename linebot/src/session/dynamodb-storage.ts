@@ -20,6 +20,29 @@ export class DynamoDBSessionStorage implements SessionStorage {
     this.tableName = tableName;
   }
 
+  /**
+   * Recursively convert Date objects to ISO strings using JSON serialization
+   */
+  private serializeState(state: ConversationState): any {
+    return JSON.parse(JSON.stringify(state, (_key, value) => {
+      if (value instanceof Date) {
+        return value.toISOString();
+      }
+      return value;
+    }));
+  }
+
+  /**
+   * Convert ISO strings back to Date objects for known date fields
+   */
+  private deserializeState(state: any): ConversationState {
+    return {
+      ...state,
+      createdAt: typeof state.createdAt === 'string' ? new Date(state.createdAt) : state.createdAt,
+      updatedAt: typeof state.updatedAt === 'string' ? new Date(state.updatedAt) : state.updatedAt,
+    };
+  }
+
   async get(userId: string): Promise<ConversationState | null> {
     try {
       const command = new GetCommand({
@@ -43,11 +66,7 @@ export class DynamoDBSessionStorage implements SessionStorage {
       const state = response.Item.state as any;
 
       // Convert ISO strings back to Date objects
-      return {
-        ...state,
-        createdAt: typeof state.createdAt === 'string' ? new Date(state.createdAt) : state.createdAt,
-        updatedAt: typeof state.updatedAt === 'string' ? new Date(state.updatedAt) : state.updatedAt,
-      };
+      return this.deserializeState(state);
     } catch (error) {
       console.error('DynamoDB get error:', error);
       throw new Error(`Failed to get session: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -59,12 +78,8 @@ export class DynamoDBSessionStorage implements SessionStorage {
       // Set TTL to 24 hours from now
       const ttl = Math.floor(Date.now() / 1000) + 86400;
 
-      // Convert Date objects to ISO strings for DynamoDB
-      const serializedState = {
-        ...state,
-        createdAt: state.createdAt instanceof Date ? state.createdAt.toISOString() : state.createdAt,
-        updatedAt: state.updatedAt instanceof Date ? state.updatedAt.toISOString() : state.updatedAt,
-      };
+      // Serialize all Date objects to ISO strings
+      const serializedState = this.serializeState(state);
 
       const command = new PutCommand({
         TableName: this.tableName,
