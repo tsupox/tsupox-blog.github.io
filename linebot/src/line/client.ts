@@ -27,6 +27,7 @@ export interface LineQuickReplyItem {
 
 export class LineApiClient {
   private readonly baseUrl = 'https://api.line.me/v2/bot';
+  private readonly contentUrl = 'https://api-data.line.me/v2/bot';
   private readonly accessToken: string;
 
   constructor(config: Config) {
@@ -139,7 +140,8 @@ export class LineApiClient {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/message/${messageId}/content`, {
+      // Use content URL for downloading media
+      const response = await fetch(`${this.contentUrl}/message/${messageId}/content`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${this.accessToken}`,
@@ -149,6 +151,8 @@ export class LineApiClient {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('LINE API download error:', {
+          messageId,
+          url: `${this.contentUrl}/message/${messageId}/content`,
           status: response.status,
           statusText: response.statusText,
           body: errorText,
@@ -164,7 +168,7 @@ export class LineApiClient {
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      console.log(`Downloaded image: ${buffer.length} bytes`);
+      console.log(`Downloaded image: ${buffer.length} bytes from message ${messageId}`);
       return buffer;
     } catch (error) {
       if (error instanceof ExternalServiceError) {
