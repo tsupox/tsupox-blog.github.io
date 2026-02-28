@@ -2,10 +2,12 @@
  * Message processor - handles message processing based on conversation state
  */
 
-import { LineMessage, ConversationState, ConversationStep, Config } from '../types';
+import { LineMessage, ConversationState, ConversationStep, Config, GitHubFile } from '../types';
 import { ConversationFlow } from './flow';
 import { createImageProcessor, ImageProcessor } from '../image';
 import { LineApiClient } from '../line/client';
+import { PostGenerator } from '../blog';
+import { GitHubClient } from '../github';
 
 export interface ProcessingResult {
   nextState?: ConversationState;
@@ -16,11 +18,15 @@ export class MessageProcessor {
   private flow: ConversationFlow;
   private imageProcessor: ImageProcessor;
   private lineClient: LineApiClient;
+  private postGenerator: PostGenerator;
+  private githubClient: GitHubClient;
 
   constructor(private config: Config) {
     this.flow = new ConversationFlow();
     this.imageProcessor = createImageProcessor(config);
     this.lineClient = new LineApiClient(config);
+    this.postGenerator = new PostGenerator();
+    this.githubClient = new GitHubClient(config.github.token);
   }
 
   /**
@@ -75,6 +81,12 @@ export class MessageProcessor {
 
       case ConversationStep.WAITING_TITLE:
         return this.handleTitleInput(trimmedText, currentState);
+
+      case ConversationStep.WAITING_SLUG:
+        return this.handleSlugInput(trimmedText, currentState);
+
+      case ConversationStep.WAITING_DATE:
+        return this.handleDateInput(trimmedText, currentState);
 
       case ConversationStep.WAITING_CONTENT:
         return this.handleContentInput(trimmedText, currentState);
@@ -237,6 +249,83 @@ export class MessageProcessor {
     return {
       nextState,
       responseMessage: `タイトル: "${text}"\n\n` +
+        '次に、ファイル名（英数字とハイフン）を入力してください。\n' +
+        '例: nekonohi, my-blog-post, daily-note'
+    };
+  }
+
+  /**
+   * Handle slug (filename) input
+   */
+  private handleSlugInput(text: string, currentState: ConversationState): ProcessingResult {
+    // Validate slug format (alphanumeric and hyphens only)
+    const slugRegex = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+    if (!slugRegex.test(text)) {
+      return {
+        responseMessage: 'ファイル名は英小文字、数字、ハイフン（-）のみ使用できます。\n' +
+          '例: nekonohi, my-blog-post, daily-note\n\n' +
+          'もう一度入力してください。'
+      };
+    }
+
+    if (text.length < 1 || text.length > 100) {
+      return {
+        responseMessage: 'ファイル名は1〜100文字で入力してください。'
+      };
+    }
+
+    const nextState = this.flow.transitionToNext(currentState, { slug: text });
+
+    return {
+      nextState,
+      responseMessage: `ファイル名: "${text}"\n\n` +
+        '次に、投稿日付を入力してください。\n' +
+        '形式: YYYY-MM-DD（例: 2026-02-22）\n' +
+        '今日の日付にする場合は「今日」と入力してください。'
+    };
+  }
+
+  /**
+   * Handle date input
+   */
+  private handleDateInput(text: string, currentState: ConversationState): ProcessingResult {
+    let postDate: string;
+
+    // Handle "today" keyword
+    if (text === '今日' || text.toLowerCase() === 'today') {
+      const today = new Date();
+      postDate = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    } else {
+      // Validate date format
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+      if (!dateRegex.test(text)) {
+        return {
+          responseMessage: '日付の形式が正しくありません。\n' +
+            '形式: YYYY-MM-DD（例: 2026-02-22）\n' +
+            '今日の日付にする場合は「今日」と入力してください。\n\n' +
+            'もう一度入力してください。'
+        };
+      }
+
+      // Validate that it's a valid date
+      const date = new Date(text);
+      if (isNaN(date.getTime())) {
+        return {
+          responseMessage: '有効な日付を入力してください。\n' +
+            '例: 2026-02-22'
+        };
+      }
+
+      postDate = text;
+    }
+
+    const nextState = this.flow.transitionToNext(currentState, { postDate });
+
+    return {
+      nextState,
+      responseMessage: `投稿日付: ${postDate}\n\n` +
         '次に、投稿の本文を入力してください。'
     };
   }
@@ -313,19 +402,31 @@ export class MessageProcessor {
   /**
    * Handle confirmation
    */
-  private handleConfirmation(text: string, currentState: ConversationState): ProcessingResult {
+  private async handleConfirmation(text: string, currentState: ConversationState): Promise<ProcessingResult> {
     const lowerText = text.toLowerCase().trim();
 
     if (['はい', 'yes', 'y', '公開', '投稿', 'ok'].includes(lowerText)) {
-      // TODO: Implement actual blog post creation
-      const nextState = this.flow.transitionTo(currentState, ConversationStep.IDLE);
+      try {
+        // Create blog post
+        await this.createBlogPost(currentState);
 
-      return {
-        nextState,
-        responseMessage: '投稿を公開しました！🎉\n\n' +
-          `ブログURL: ${this.config.blog.baseUrl}\n\n` +
-          '新しい投稿を作成するには「投稿作成」と送信してください。'
-      };
+        const nextState = this.flow.transitionTo(currentState, ConversationStep.IDLE);
+
+        return {
+          nextState,
+          responseMessage: '投稿を公開しました！🎉\n\n' +
+            `ブログURL: ${this.config.blog.baseUrl}\n\n` +
+            '新しい投稿を作成するには「投稿作成」と送信してください。'
+        };
+      } catch (error) {
+        console.error('Error creating blog post:', error);
+        return {
+          responseMessage: '投稿の公開中にエラーが発生しました。😢\n\n' +
+            'もう一度「はい」と送信して再試行するか、\n' +
+            '「いいえ」でキャンセルしてください。\n\n' +
+            `エラー: ${error instanceof Error ? error.message : '不明なエラー'}`
+        };
+      }
     }
 
     if (['いいえ', 'no', 'n', 'キャンセル', '修正'].includes(lowerText)) {
@@ -343,6 +444,71 @@ export class MessageProcessor {
         '投稿を公開する場合は「はい」\n' +
         'キャンセルする場合は「いいえ」と送信してください。'
     };
+  }
+
+  /**
+   * Create and publish blog post to GitHub
+   */
+  private async createBlogPost(state: ConversationState): Promise<void> {
+    const { slug, postDate, imageUrl, imagePath } = state.data;
+
+    if (!slug || !postDate || !imageUrl || !imagePath) {
+      throw new Error('Required data is missing: slug, postDate, imageUrl, or imagePath');
+    }
+
+    // Determine image folder (default to rakugaki)
+    const year = postDate.split('-')[0];
+    const imageFolder = `${year}-rakugaki`;
+
+    // Generate image filename from slug
+    const imageExtension = imagePath.split('.').pop() || 'jpg';
+    const imageFilename = `${slug}.${imageExtension}`;
+
+    // Generate blog post
+    const generatedPost = this.postGenerator.generatePost(state, {
+      categories: this.config.blog.categories,
+      imageFolder,
+      imageFilename
+    });
+
+    console.log(`Generated blog post: ${generatedPost.filename}`);
+
+    // Download image from temp storage
+    const imageBuffer = await this.imageProcessor.downloadFromTempStorage(imageUrl);
+
+    // Prepare files for GitHub commit
+    const files: GitHubFile[] = [
+      {
+        path: `source/_posts/${generatedPost.filename}`,
+        content: generatedPost.content,
+        encoding: 'utf-8'
+      },
+      {
+        path: `source/images/${imageFolder}/${imageFilename}`,
+        content: imageBuffer,
+        encoding: 'base64'
+      }
+    ];
+
+    // Commit to GitHub
+    const commitMessage = `Add blog post: ${state.data.title}\n\nPublished via LINE Bot`;
+
+    await this.githubClient.commitFiles(files, {
+      owner: this.config.github.owner,
+      repo: this.config.github.repo,
+      branch: 'master', // Use master branch
+      message: commitMessage
+    });
+
+    console.log('Successfully committed blog post to GitHub');
+
+    // Clean up temporary image
+    try {
+      await this.imageProcessor.cleanupTempStorage(imageUrl);
+    } catch (error) {
+      console.warn('Failed to cleanup temp image:', error);
+      // Don't throw - cleanup failure shouldn't fail the whole operation
+    }
   }
 
   /**
@@ -389,12 +555,14 @@ export class MessageProcessor {
    * Generate confirmation message
    */
   private generateConfirmationMessage(state: ConversationState): string {
-    const { title, content, tags } = state.data;
+    const { title, slug, postDate, content, tags } = state.data;
 
     return '投稿内容を確認してください:\n\n' +
-      `📝 タイトル: ${title}\n\n` +
-      `📄 本文: ${content?.substring(0, 100)}${content && content.length > 100 ? '...' : ''}\n\n` +
-      `🏷️ タグ: ${tags.join(', ')}\n\n` +
+      `📝 タイトル: ${title}\n` +
+      `📄 ファイル名: ${slug}\n` +
+      `📅 投稿日付: ${postDate}\n` +
+      `📄 本文: ${content?.substring(0, 100)}${content && content.length > 100 ? '...' : ''}\n` +
+      `🏷️ タグ: ${tags.join(', ')}\n` +
       `📸 画像: 添付済み\n\n` +
       'この内容で投稿を公開しますか？\n' +
       '「はい」で公開、「いいえ」でキャンセルしてください。';
@@ -411,10 +579,12 @@ export class MessageProcessor {
       '• キャンセル - 投稿作成を中止\n\n' +
       '【投稿作成の流れ】\n' +
       '1. タイトル入力\n' +
-      '2. 本文入力\n' +
-      '3. 画像送信\n' +
-      '4. タグ選択\n' +
-      '5. 確認・公開\n\n' +
+      '2. ファイル名入力（英数字）\n' +
+      '3. 投稿日付入力\n' +
+      '4. 本文入力\n' +
+      '5. 画像送信\n' +
+      '6. タグ選択\n' +
+      '7. 確認・公開\n\n' +
       '【対応ファイル形式】\n' +
       '• 画像: JPEG, PNG, GIF\n\n' +
       '何か問題があれば「投稿作成」と送信して最初からやり直してください。';
