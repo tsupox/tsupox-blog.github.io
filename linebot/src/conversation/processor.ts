@@ -6,6 +6,13 @@ import { LineMessage, ConversationState, ConversationStep, Config } from '../typ
 import { ConversationFlow } from './flow';
 import { createImageProcessor, ImageProcessor } from '../image';
 import { LineApiClient } from '../line/client';
+import { GitHubApiClient } from '../github/client';
+import { HexoPostGenerator } from '../post/generator';
+import { DefaultTagManager } from '../post/tag-manager';
+import { generateCommitMessage } from '../github/commit-message';
+import { fetchExistingTags } from '../github/tag-extractor';
+import { preparePostFiles, getImageRepoPath, toMarkdownImagePath } from '../post/file-placement';
+import { logError } from '../errors';
 
 export interface ProcessingResult {
   nextState?: ConversationState;
@@ -16,11 +23,17 @@ export class MessageProcessor {
   private flow: ConversationFlow;
   private imageProcessor: ImageProcessor;
   private lineClient: LineApiClient;
+  private githubClient: GitHubApiClient;
+  private postGenerator: HexoPostGenerator;
+  private tagManager: DefaultTagManager;
 
   constructor(private config: Config) {
     this.flow = new ConversationFlow();
     this.imageProcessor = createImageProcessor(config);
     this.lineClient = new LineApiClient(config);
+    this.githubClient = new GitHubApiClient(config);
+    this.postGenerator = new HexoPostGenerator();
+    this.tagManager = new DefaultTagManager(config.blog.availableTags);
   }
 
   /**
@@ -65,7 +78,7 @@ export class MessageProcessor {
 
     // Handle global commands
     if (this.isGlobalCommand(trimmedText)) {
-      return this.handleGlobalCommand(trimmedText, currentState);
+      return await this.handleGlobalCommand(trimmedText, currentState);
     }
 
     // Process based on current conversation step
@@ -123,10 +136,14 @@ export class MessageProcessor {
         imagePath: processedImage.relativePath
       });
 
+      // Fetch existing tags from GitHub repo and merge with config tags (Requirement 1.4)
+      await this.refreshRepoTags();
+      const availableTags = this.tagManager.getAvailableTags();
+
       const responseMessage = '画像を受信しました！📸\n\n' +
         '次にタグを選択してください。\n' +
         '利用可能なタグ:\n' +
-        this.formatAvailableTags() + '\n\n' +
+        this.tagManager.formatTagsForSelection(availableTags) + '\n\n' +
         'タグ番号をカンマ区切りで入力してください（例: 1,3,5）\n' +
         '新しいタグを追加する場合は「新規:タグ名」と入力してください。';
 
@@ -168,7 +185,7 @@ export class MessageProcessor {
   /**
    * Handle global commands
    */
-  private handleGlobalCommand(command: string, currentState: ConversationState): ProcessingResult {
+  private async handleGlobalCommand(command: string, currentState: ConversationState): Promise<ProcessingResult> {
     const lowerCommand = command.toLowerCase();
 
     if (lowerCommand === '投稿作成') {
@@ -188,6 +205,15 @@ export class MessageProcessor {
 
     if (['キャンセル', 'cancel', 'やめる', '中止'].includes(lowerCommand)) {
       if (this.flow.canCancel(currentState.step)) {
+        // Requirement 8.3: Cleanup temp storage on cancel
+        if (currentState.data.imageUrl) {
+          try {
+            await this.imageProcessor.cleanupTempStorage(currentState.data.imageUrl);
+          } catch (cleanupError) {
+            console.warn('Failed to cleanup temp storage on cancel:', cleanupError);
+          }
+        }
+
         const nextState = this.flow.transitionTo(currentState, ConversationStep.IDLE);
         return {
           nextState,
@@ -208,12 +234,46 @@ export class MessageProcessor {
 
   /**
    * Handle IDLE state
+   * Includes post-publish confirmation flow (Requirements 9.3, 9.4)
    */
-  private handleIdleState(_text: string, _currentState: ConversationState): ProcessingResult {
+  private handleIdleState(text: string, currentState: ConversationState): ProcessingResult {
+    // Post-publish confirmation: "確認" keyword (Requirement 9.3)
+    if (this.isConfirmKeyword(text) && currentState.lastPublishedUrl) {
+      return {
+        responseMessage: `投稿先URL: ${currentState.lastPublishedUrl}\n\n` +
+          'カスタムドメインへの反映にはさらに時間がかかる場合があります。'
+      };
+    }
+
+    // Post-publish confirmation: "見られない" etc. keyword (Requirement 9.4)
+    if (this.isTroubleKeyword(text) && currentState.lastPublishedUrl) {
+      return {
+        responseMessage: 'GitHub Actionsによるページ生成に数分かかります。\n' +
+          'しばらくお待ちいただき、再度アクセスしてください。\n\n' +
+          `投稿先URL: ${currentState.lastPublishedUrl}`
+      };
+    }
+
     return {
       responseMessage: '投稿を作成するには「投稿作成」と送信してください。\n' +
         'ヘルプが必要な場合は「ヘルプ」と送信してください。'
     };
+  }
+
+  /**
+   * Check if text is a post-publish confirmation keyword
+   */
+  private isConfirmKeyword(text: string): boolean {
+    const keywords = ['確認', 'url', 'リンク', 'アドレス'];
+    return keywords.some(kw => text.toLowerCase().includes(kw));
+  }
+
+  /**
+   * Check if text indicates trouble viewing the published post
+   */
+  private isTroubleKeyword(text: string): boolean {
+    const keywords = ['見られない', '見れない', '表示されない', '開けない', 'アクセスできない', '404', 'not found'];
+    return keywords.some(kw => text.toLowerCase().includes(kw));
   }
 
   /**
@@ -280,16 +340,29 @@ export class MessageProcessor {
 
   /**
    * Handle tag selection
+   * Uses TagManager for parsing mixed input (numbers, direct names, new tags)
+   * Requirement 1.4: 既存タグ一覧を表示して選択または新規作成を促す
    */
   private handleTagSelection(text: string, currentState: ConversationState): ProcessingResult {
     try {
-      const selectedTags = this.parseTagSelection(text);
+      const availableTags = this.tagManager.getAvailableTags();
+      const selectedTags = this.tagManager.parseSelectedTags(text, availableTags);
 
       if (selectedTags.length === 0) {
         return {
           responseMessage: '有効なタグを選択してください。\n\n' +
-            this.formatAvailableTags() + '\n\n' +
-            'タグ番号をカンマ区切りで入力してください（例: 1,3,5）'
+            this.tagManager.formatTagsForSelection(availableTags) + '\n\n' +
+            'タグ番号をカンマ区切りで入力してください（例: 1,3,5）\n' +
+            '新しいタグを追加する場合は「新規:タグ名」と入力してください。'
+        };
+      }
+
+      if (!this.tagManager.validateTags(selectedTags)) {
+        return {
+          responseMessage: 'タグの形式に問題があります。\n' +
+            'タグは1〜20文字で、最大10個まで選択できます。\n\n' +
+            this.tagManager.formatTagsForSelection(availableTags) + '\n\n' +
+            'もう一度タグを入力してください。'
         };
       }
 
@@ -302,30 +375,33 @@ export class MessageProcessor {
         responseMessage: confirmationMessage
       };
     } catch (error) {
+      const availableTags = this.tagManager.getAvailableTags();
       return {
         responseMessage: 'タグの選択でエラーが発生しました。\n\n' +
-          this.formatAvailableTags() + '\n\n' +
+          this.tagManager.formatTagsForSelection(availableTags) + '\n\n' +
           'もう一度タグ番号を入力してください。'
       };
     }
   }
 
   /**
-   * Handle confirmation
+   * Handle confirmation - publish post to GitHub or cancel
+   *
+   * Requirements:
+   * - 6.1: 成功メッセージにブログURLを含める
+   * - 6.4: 処理中通知
+   * - 6.6: GitHubコミット完了後にのみ成功メッセージを送信
+   * - 9.1: ページ生成に数分かかる旨を伝える
+   * - 9.2: カスタムドメイン反映遅延の説明
    */
-  private handleConfirmation(text: string, currentState: ConversationState): ProcessingResult {
+  private async handleConfirmation(
+    text: string,
+    currentState: ConversationState
+  ): Promise<ProcessingResult> {
     const lowerText = text.toLowerCase().trim();
 
-    if (['はい', 'yes', 'y', '公開', '投稿', 'ok'].includes(lowerText)) {
-      // TODO: Implement actual blog post creation
-      const nextState = this.flow.transitionTo(currentState, ConversationStep.IDLE);
-
-      return {
-        nextState,
-        responseMessage: '投稿を公開しました！🎉\n\n' +
-          `ブログURL: ${this.config.blog.baseUrl}\n\n` +
-          '新しい投稿を作成するには「投稿作成」と送信してください。'
-      };
+    if (['はい', 'yes', 'y', '公開', '公開する', '投稿', 'ok'].includes(lowerText)) {
+      return await this.publishPost(currentState);
     }
 
     if (['いいえ', 'no', 'n', 'キャンセル', '修正'].includes(lowerText)) {
@@ -346,43 +422,106 @@ export class MessageProcessor {
   }
 
   /**
-   * Parse tag selection from user input
+   * Publish post to GitHub and return success message
+   *
+   * Flow:
+   * 1. Generate Hexo post from collected data
+   * 2. Download image from temp storage if present
+   * 3. Prepare commit files (post + image)
+   * 4. Await GitHub commit completion
+   * 5. Cleanup temp storage (guaranteed via finally)
+   * 6. Return success message with blog URL and delay explanations
+   *
+   * Requirements: 6.1, 6.6, 8.3, 9.1, 9.2
    */
-  private parseTagSelection(text: string): string[] {
-    const availableTags = this.config.blog.availableTags;
-    const selectedTags: string[] = [];
+  private async publishPost(currentState: ConversationState): Promise<ProcessingResult> {
+    const tempStorageKey = currentState.data.imageUrl;
+    try {
+      const { data } = currentState;
 
-    // Handle new tag creation
-    if (text.startsWith('新規:')) {
-      const newTag = text.substring(3).trim();
-      if (newTag.length > 0 && newTag.length <= 20) {
-        return [newTag];
+      // Convert image path for Markdown link
+      const postData = { ...data };
+      if (postData.imagePath) {
+        postData.imagePath = toMarkdownImagePath(postData.imagePath);
       }
-      return [];
-    }
 
-    // Parse tag numbers
-    const tagNumbers = text.split(',').map(num => parseInt(num.trim()));
+      // 1. Generate Hexo post
+      const generatedPost = this.postGenerator.generatePost(postData, this.config);
 
-    for (const num of tagNumbers) {
-      if (num >= 1 && num <= availableTags.length) {
-        const tag = availableTags[num - 1];
-        if (!selectedTags.includes(tag)) {
-          selectedTags.push(tag);
+      // 2. Download image from temp storage if present
+      let imageBuffer: Buffer | undefined;
+      let imageRepoPath: string | undefined;
+      if (data.imageUrl && data.imagePath) {
+        imageBuffer = await this.imageProcessor.downloadFromTempStorage(data.imageUrl);
+        imageRepoPath = getImageRepoPath(data.imagePath);
+      }
+
+      // 3. Prepare commit files
+      const commitFiles = preparePostFiles(
+        generatedPost.filename,
+        generatedPost.content,
+        imageRepoPath,
+        imageBuffer
+      );
+
+      // 4. Generate commit message
+      const commitMessage = generateCommitMessage(data, generatedPost.filename);
+
+      // 5. Await GitHub commit (Requirement 6.6: must complete before success message)
+      const githubFiles = commitFiles.map(f => ({
+        path: f.repoPath,
+        content: f.content,
+        encoding: f.encoding,
+      }));
+      await this.githubClient.commitMultipleFiles(githubFiles, commitMessage);
+
+      // 6. Transition to IDLE, preserving publish info for post-publish confirmation flow
+      const nextState = this.flow.transitionTo(currentState, ConversationStep.IDLE);
+      const blogUrl = this.config.blog.baseUrl;
+      nextState.lastPublishedUrl = blogUrl;
+      nextState.lastPublishedAt = new Date();
+
+      // 7. Build success message (Requirements 6.1, 9.1, 9.2)
+      const successMessage =
+        '投稿をしました！🎉\n\n' +
+        'GitHub Actionsによるページの生成に数分かかるため、しばらくしてから確認してください。\n' +
+        'カスタムドメインへの反映にはさらに時間がかかる場合があります。\n\n' +
+        `ブログURL: ${blogUrl}`;
+
+      return {
+        nextState,
+        responseMessage: successMessage,
+      };
+    } catch (error) {
+      logError(error, undefined, { step: 'publishPost', title: currentState.data.title });
+
+      return {
+        responseMessage: '投稿の公開中にエラーが発生しました。😢\n\n' +
+          'しばらく時間をおいて「はい」と送信して再度お試しください。\n' +
+          'それでも解決しない場合は「キャンセル」して最初からやり直してください。',
+      };
+    } finally {
+      // Requirement 8.3: Cleanup temp storage regardless of success/failure
+      if (tempStorageKey) {
+        try {
+          await this.imageProcessor.cleanupTempStorage(tempStorageKey);
+        } catch (cleanupError) {
+          console.warn('Failed to cleanup temp storage:', cleanupError);
         }
       }
     }
-
-    return selectedTags;
   }
 
   /**
-   * Format available tags for display
+   * Refresh repo tags from GitHub (best-effort, falls back to config tags only)
    */
-  private formatAvailableTags(): string {
-    return this.config.blog.availableTags
-      .map((tag, index) => `${index + 1}. ${tag}`)
-      .join('\n');
+  private async refreshRepoTags(): Promise<void> {
+    try {
+      const repoTags = await fetchExistingTags(this.githubClient);
+      this.tagManager.setRepoTags(repoTags);
+    } catch (error) {
+      console.warn('Failed to fetch repo tags, using config tags only:', error);
+    }
   }
 
   /**

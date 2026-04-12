@@ -184,7 +184,7 @@ describe('LineApiClient', () => {
       const result = await client.downloadImage('test-message-id');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.line.me/v2/bot/message/test-message-id/content',
+        'https://api-data.line.me/v2/bot/message/test-message-id/content',
         {
           method: 'GET',
           headers: {

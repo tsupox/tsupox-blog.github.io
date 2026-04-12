@@ -36,11 +36,15 @@ export class DynamoDBSessionStorage implements SessionStorage {
    * Convert ISO strings back to Date objects for known date fields
    */
   private deserializeState(state: any): ConversationState {
-    return {
+    const result: ConversationState = {
       ...state,
       createdAt: typeof state.createdAt === 'string' ? new Date(state.createdAt) : state.createdAt,
       updatedAt: typeof state.updatedAt === 'string' ? new Date(state.updatedAt) : state.updatedAt,
     };
+    if (state.lastPublishedAt) {
+      result.lastPublishedAt = typeof state.lastPublishedAt === 'string' ? new Date(state.lastPublishedAt) : state.lastPublishedAt;
+    }
+    return result;
   }
 
   async get(userId: string): Promise<ConversationState | null> {
@@ -98,8 +102,14 @@ export class DynamoDBSessionStorage implements SessionStorage {
     }
   }
 
-  async resetToIdle(userId: string): Promise<void> {
+  async resetToIdle(userId: string, preserveFields?: { lastPublishedUrl?: string; lastPublishedAt?: Date }): Promise<void> {
     const idleState = createIdleState();
+    if (preserveFields?.lastPublishedUrl) {
+      idleState.lastPublishedUrl = preserveFields.lastPublishedUrl;
+    }
+    if (preserveFields?.lastPublishedAt) {
+      idleState.lastPublishedAt = preserveFields.lastPublishedAt;
+    }
     await this.set(userId, idleState);
   }
 

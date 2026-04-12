@@ -128,27 +128,163 @@ npm run lint
 
 ## アーキテクチャ
 
-- **フロントエンド**: LINE Messaging API
-- **バックエンド**: AWS Lambda (Node.js/TypeScript)
-- **セッション管理**: DynamoDB
-- **画像保存**: S3
-- **ブログ更新**: GitHub API
+```
+LINE App
+  │
+  ▼
+LINE Messaging API
+  │  Webhook (POST /webhook)
+  ▼
+API Gateway (HTTP API)
+  │  AWS_PROXY統合
+  ▼
+Lambda (Node.js 20.x)
+  ├── DynamoDB … セッション管理（会話状態の保持）
+  ├── S3 ………… 一時画像保存（1日で自動削除）
+  ├── LINE API … 画像ダウンロード・返信メッセージ送信
+  └── GitHub API … Hexo記事のコミット・プッシュ
+```
+
+CloudFormation で作成されるリソース:
+
+| リソース | 用途 |
+|---|---|
+| API Gateway (HTTP API) | LINE Webhook エンドポイント (`POST /webhook`, `GET /health`) |
+| Lambda | Webhook 処理（タイムアウト30秒、メモリ512MB） |
+| DynamoDB テーブル | ユーザーごとの会話セッション（TTL有効） |
+| S3 バケット | 一時画像保存（ライフサイクルで1日後に自動削除） |
+| IAM ロール | Lambda 用（DynamoDB・S3 アクセス権限） |
+| CloudWatch Logs | Lambda ログ（保持期間7日） |
 
 ## トラブルシューティング
 
+問題が発生した場合、以下の順番で確認してください。
+
+### 1. CloudFormation スタックの状態確認
+
+```bash
+# スタックの状態を確認
+aws cloudformation describe-stacks \
+  --stack-name <スタック名> \
+  --query "Stacks[0].{Status:StackStatus,Outputs:Outputs}"
+
+# スタックイベント（エラー時の詳細）
+aws cloudformation describe-stack-events \
+  --stack-name <スタック名> \
+  --query "StackEvents[?ResourceStatus=='CREATE_FAILED']"
+```
+
+Outputs から `WebhookUrl` を取得し、LINE Developers Console に設定する URL と一致しているか確認してください。
+
+### 2. ヘルスチェック
+
+```bash
+# API Gateway → Lambda の疎通確認
+curl -s <HealthCheckUrl の値>
+```
+
+`{"status":"ok",...}` が返れば API Gateway と Lambda の接続は正常です。
+
+### 3. Lambda の動作確認
+
+```bash
+# Lambda 関数の設定確認（環境変数・ランタイム等）
+aws lambda get-function-configuration \
+  --function-name <Lambda関数名> \
+  --query "{Runtime:Runtime,Handler:Handler,Timeout:Timeout,EnvVars:Environment.Variables|keys(@)}"
+```
+
+ログの確認:
+
+```bash
+# 最新のログを確認
+MSYS_NO_PATHCONV=1 aws logs tail /aws/lambda/<Lambda関数名> --since 1h
+
+# エラーだけ抽出
+MSYS_NO_PATHCONV=1 aws logs filter-log-events \
+  --log-group-name /aws/lambda/<Lambda関数名> \
+  --filter-pattern "ERROR"
+```
+
+> **注意（Git Bash / MSYS2 環境）:** Git Bash（MINGW64）は `/aws/...` のようなスラッシュ始まりの引数を Windows パスに自動変換します（例: `C:/Program Files/Git/aws/...`）。クォートや `//` プレフィックスでは回避できません。コマンドの先頭に `MSYS_NO_PATHCONV=1` を付けてください。PowerShell や CMD ではこの問題は発生しません。
+
+ログが一切ない場合は、LINE からの Webhook が Lambda に到達していません。LINE Developers Console の Webhook URL 設定を確認してください。
+
+### 4. LINE Webhook の確認
+
+LINE Developers Console で以下を確認:
+
+- Webhook URL が CloudFormation Outputs の `WebhookUrl` と一致しているか
+- 「Webhookの利用」がオンになっているか
+- 「検証」ボタンで成功するか（200 が返るか）
+- 「応答メッセージ」がオフになっているか（オンだと LINE 公式の自動応答が優先される）
+
+### 5. DynamoDB セッション確認
+
+```bash
+# テーブルの存在とアイテム数を確認
+aws dynamodb describe-table \
+  --table-name <テーブル名> \
+  --query "Table.{Status:TableStatus,ItemCount:ItemCount,TTL:TimeToLiveDescription}"
+
+# 特定ユーザーのセッション状態を確認
+aws dynamodb get-item \
+  --table-name <テーブル名> \
+  --key '{"userId":{"S":"<LINEユーザーID>"}}'
+
+# セッションが壊れている場合は削除してリセット
+aws dynamodb delete-item \
+  --table-name <テーブル名> \
+  --key '{"userId":{"S":"<LINEユーザーID>"}}'
+```
+
+### 6. S3 画像保存の確認
+
+```bash
+# バケットの存在確認
+aws s3 ls s3://<バケット名>/ --recursive --summarize
+
+# ライフサイクルルールの確認（1日で自動削除されるか）
+aws s3api get-bucket-lifecycle-configuration --bucket <バケット名>
+```
+
+### 7. GitHub 連携の確認
+
+```bash
+# トークンの有効性を確認
+curl -s -H "Authorization: token <GITHUB_TOKEN>" \
+  https://api.github.com/user \
+  | grep -E '"login"|"message"'
+
+# リポジトリへのアクセス確認
+curl -s -H "Authorization: token <GITHUB_TOKEN>" \
+  https://api.github.com/repos/<OWNER>/<REPO> \
+  | grep -E '"full_name"|"message"|"permissions"'
+```
+
+トークンに `repo` 権限が付与されていること、有効期限が切れていないことを確認してください。
+
+### 8. Lambda コードのデプロイ確認
+
+```bash
+# 現在デプロイされているコードのハッシュとサイズを確認
+aws lambda get-function \
+  --function-name <Lambda関数名> \
+  --query "Configuration.{CodeSize:CodeSize,LastModified:LastModified,CodeSha256:CodeSha256}"
+```
+
+CloudFormation 作成直後はプレースホルダーコードがデプロイされています。`npm run build` 後に実際のコードをデプロイする必要があります。
+
 ### よくある問題
 
-1. **Webhook接続エラー**
-   - API Gateway URLが正しく設定されているか確認
-   - 環境変数が正しく設定されているか確認
-
-2. **画像アップロードエラー**
-   - 画像サイズが制限内か確認（10MB以下推奨）
-   - 対応形式: JPEG, PNG, GIF
-
-3. **GitHub連携エラー**
-   - Personal Access Tokenの権限を確認
-   - リポジトリへのアクセス権限を確認
+| 症状 | 原因 | 対処 |
+|---|---|---|
+| Bot が一切反応しない | Webhook URL 未設定 or 不一致 | LINE Developers Console で URL を確認 |
+| 「Please deploy your code」が返る | Lambda にコードが未デプロイ | `npm run build` → デプロイスクリプト実行 |
+| 「投稿作成」に反応しない | LINE の自動応答がオン | LINE Console で応答メッセージをオフに |
+| 画像送信でエラー | S3 バケットへの権限不足 | IAM ロールのポリシーを確認 |
+| 会話が途中で止まる | DynamoDB セッション破損 | セッションを削除してリセット |
+| 「公開しました」と出るが投稿されない | GitHub Token 期限切れ or 権限不足 | トークンを再生成して環境変数を更新 |
 
 ## ライセンス
 

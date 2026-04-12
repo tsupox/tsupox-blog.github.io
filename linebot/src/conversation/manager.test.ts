@@ -9,6 +9,24 @@ import { ConversationStep, Config, LineMessage } from '../types';
 
 // Mock dependencies
 jest.mock('../line/client');
+jest.mock('../github/client');
+jest.mock('../errors', () => ({
+  getUserMessage: jest.fn((error: unknown) => {
+    if (error instanceof Error) {
+      if (error.message.includes('validation')) {
+        return 'すみません、入力内容に問題があります。もう一度お試しください。';
+      }
+      if (error.message.includes('network') || error.message.includes('timeout')) {
+        return 'ネットワークエラーが発生しました。しばらく待ってからもう一度お試しください。';
+      }
+      if (error.message.includes('storage') || error.message.includes('session')) {
+        return 'セッション管理でエラーが発生しました。「投稿作成」と送信して最初からやり直してください。';
+      }
+    }
+    return 'すみません、エラーが発生しました。「投稿作成」と送信して最初からやり直してください。';
+  }),
+  logError: jest.fn(),
+}));
 
 describe('ConversationManager', () => {
   let manager: ConversationManager;
@@ -36,6 +54,11 @@ describe('ConversationManager', () => {
         availableTags: ['タグ1', 'タグ2'],
         imageBasePath: '/images',
         categories: ['日記']
+      },
+      github: {
+        token: 'test-token',
+        owner: 'test-owner',
+        repo: 'test-repo',
       },
       imageStorage: {
         type: 's3',

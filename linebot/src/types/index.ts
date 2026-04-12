@@ -42,6 +42,8 @@ export interface ConversationState {
   data: PostData;
   createdAt: Date;
   updatedAt: Date;
+  lastPublishedUrl?: string;
+  lastPublishedAt?: Date;
 }
 
 // Image Processing Types

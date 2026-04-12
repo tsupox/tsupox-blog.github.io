@@ -120,5 +120,21 @@ describe('Session Storage Utilities', () => {
       expect(updatedState.data).toEqual(originalState.data);
       expect(updatedState.updatedAt.getTime()).toBeGreaterThan(originalState.updatedAt.getTime());
     });
+
+    it('should preserve lastPublishedUrl and lastPublishedAt through state updates', () => {
+      const originalState = {
+        step: ConversationStep.IDLE,
+        data: { tags: [] },
+        createdAt: new Date('2024-01-01T10:00:00Z'),
+        updatedAt: new Date('2024-01-01T10:00:00Z'),
+        lastPublishedUrl: 'https://test-blog.com',
+        lastPublishedAt: new Date('2024-01-01T11:00:00Z'),
+      };
+
+      const updatedState = updateStateStep(originalState, ConversationStep.WAITING_TITLE);
+
+      expect(updatedState.lastPublishedUrl).toBe('https://test-blog.com');
+      expect(updatedState.lastPublishedAt).toEqual(new Date('2024-01-01T11:00:00Z'));
+    });
   });
 });

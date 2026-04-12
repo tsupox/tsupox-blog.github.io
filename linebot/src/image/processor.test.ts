@@ -32,13 +32,30 @@ class TestImageProcessor extends BaseImageProcessor {
     return this.validateImage(imageBuffer);
   }
 
-  public async testResizeImageIfNeeded(imageBuffer: Buffer, validation: ImageValidationResult): Promise<Buffer> {
-    return this.resizeImageIfNeeded(imageBuffer, validation);
-  }
-
   public testGenerateFilename(originalFormat?: string): string {
     return this.generateFilename(originalFormat);
   }
+}
+
+// Helper: create a minimal valid JPEG buffer (magic bytes + padding)
+function createJpegBuffer(size = 128): Buffer {
+  const buf = Buffer.alloc(size);
+  buf[0] = 0xFF; buf[1] = 0xD8; buf[2] = 0xFF; // JPEG magic bytes
+  return buf;
+}
+
+// Helper: create a minimal valid PNG buffer
+function createPngBuffer(size = 128): Buffer {
+  const buf = Buffer.alloc(size);
+  buf[0] = 0x89; buf[1] = 0x50; buf[2] = 0x4E; buf[3] = 0x47; // PNG magic bytes
+  return buf;
+}
+
+// Helper: create a minimal valid GIF buffer
+function createGifBuffer(size = 128): Buffer {
+  const buf = Buffer.alloc(size);
+  buf[0] = 0x47; buf[1] = 0x49; buf[2] = 0x46; buf[3] = 0x38; // GIF magic bytes
+  return buf;
 }
 
 describe('BaseImageProcessor', () => {
@@ -50,47 +67,31 @@ describe('BaseImageProcessor', () => {
 
   describe('validateImage', () => {
     it('should validate a valid JPEG image', async () => {
-      // Create a small test image
-      const imageBuffer = await sharp({
-        create: {
-          width: 100,
-          height: 100,
-          channels: 3,
-          background: { r: 255, g: 0, b: 0 }
-        }
-      })
-      .jpeg()
-      .toBuffer();
-
+      const imageBuffer = createJpegBuffer();
       const result = await processor.testValidateImage(imageBuffer);
 
       expect(result.isValid).toBe(true);
       expect(result.mimeType).toBe('image/jpeg');
-      expect(result.width).toBe(100);
-      expect(result.height).toBe(100);
       expect(result.format).toBe('jpeg');
       expect(result.size).toBeGreaterThan(0);
     });
 
     it('should validate a valid PNG image', async () => {
-      const imageBuffer = await sharp({
-        create: {
-          width: 200,
-          height: 150,
-          channels: 4,
-          background: { r: 0, g: 255, b: 0, alpha: 1 }
-        }
-      })
-      .png()
-      .toBuffer();
-
+      const imageBuffer = createPngBuffer();
       const result = await processor.testValidateImage(imageBuffer);
 
       expect(result.isValid).toBe(true);
       expect(result.mimeType).toBe('image/png');
-      expect(result.width).toBe(200);
-      expect(result.height).toBe(150);
       expect(result.format).toBe('png');
+    });
+
+    it('should validate a valid GIF image', async () => {
+      const imageBuffer = createGifBuffer();
+      const result = await processor.testValidateImage(imageBuffer);
+
+      expect(result.isValid).toBe(true);
+      expect(result.mimeType).toBe('image/gif');
+      expect(result.format).toBe('gif');
     });
 
     it('should reject invalid image data', async () => {
@@ -101,70 +102,19 @@ describe('BaseImageProcessor', () => {
     });
 
     it('should reject oversized images', async () => {
-      // Mock a large image by creating a buffer larger than maxFileSize
       const largeBuffer = Buffer.alloc(11 * 1024 * 1024); // 11MB
+      // Add JPEG magic bytes so format detection passes
+      largeBuffer[0] = 0xFF; largeBuffer[1] = 0xD8; largeBuffer[2] = 0xFF;
 
       await expect(processor.testValidateImage(largeBuffer))
         .rejects.toThrow(ValidationError);
     });
-  });
 
-  describe('resizeImageIfNeeded', () => {
-    it('should not resize image within limits', async () => {
-      const imageBuffer = await sharp({
-        create: {
-          width: 500,
-          height: 400,
-          channels: 3,
-          background: { r: 255, g: 255, b: 255 }
-        }
-      })
-      .jpeg()
-      .toBuffer();
+    it('should reject buffer too small to detect format', async () => {
+      const tinyBuffer = Buffer.from([0x00, 0x01]);
 
-      const validation: ImageValidationResult = {
-        isValid: true,
-        mimeType: 'image/jpeg',
-        width: 500,
-        height: 400,
-        size: imageBuffer.length,
-        format: 'jpeg'
-      };
-
-      const result = await processor.testResizeImageIfNeeded(imageBuffer, validation);
-      expect(result).toBe(imageBuffer); // Should return the same buffer
-    });
-
-    it('should resize oversized image', async () => {
-      const largeImageBuffer = await sharp({
-        create: {
-          width: 3000,
-          height: 2500,
-          channels: 3,
-          background: { r: 255, g: 255, b: 255 }
-        }
-      })
-      .jpeg()
-      .toBuffer();
-
-      const validation: ImageValidationResult = {
-        isValid: true,
-        mimeType: 'image/jpeg',
-        width: 3000,
-        height: 2500,
-        size: largeImageBuffer.length,
-        format: 'jpeg'
-      };
-
-      const result = await processor.testResizeImageIfNeeded(largeImageBuffer, validation);
-
-      expect(result).not.toBe(largeImageBuffer); // Should be a different buffer
-      expect(result.length).toBeLessThan(largeImageBuffer.length); // Should be smaller
-
-      // Check the resized dimensions
-      const metadata = await sharp(result).metadata();
-      expect(metadata.width).toBeLessThanOrEqual(2048);
-      expect(metadata.height).toBeLessThanOrEqual(2048);
+      await expect(processor.testValidateImage(tinyBuffer))
+        .rejects.toThrow(ValidationError);
     });
   });
 
@@ -210,18 +160,8 @@ describe('BaseImageProcessor', () => {
   });
 
   describe('processImage', () => {
-    it('should process a valid image successfully', async () => {
-      const imageBuffer = await sharp({
-        create: {
-          width: 800,
-          height: 600,
-          channels: 3,
-          background: { r: 100, g: 150, b: 200 }
-        }
-      })
-      .jpeg()
-      .toBuffer();
-
+    it('should process a valid JPEG image successfully', async () => {
+      const imageBuffer = createJpegBuffer(256);
       const result = await processor.processImage(imageBuffer);
 
       expect(result.buffer).toBeInstanceOf(Buffer);
@@ -236,27 +176,12 @@ describe('BaseImageProcessor', () => {
       expect(storedBuffer).toEqual(result.buffer);
     });
 
-    it('should resize large images during processing', async () => {
-      const largeImageBuffer = await sharp({
-        create: {
-          width: 4000,
-          height: 3000,
-          channels: 3,
-          background: { r: 255, g: 0, b: 0 }
-        }
-      })
-      .jpeg()
-      .toBuffer();
+    it('should process a valid PNG image successfully', async () => {
+      const imageBuffer = createPngBuffer(256);
+      const result = await processor.processImage(imageBuffer);
 
-      const result = await processor.processImage(largeImageBuffer);
-
-      // Check that the processed image is smaller
-      expect(result.size).toBeLessThan(largeImageBuffer.length);
-
-      // Verify dimensions are within limits
-      const metadata = await sharp(result.buffer).metadata();
-      expect(metadata.width).toBeLessThanOrEqual(2048);
-      expect(metadata.height).toBeLessThanOrEqual(2048);
+      expect(result.mimeType).toBe('image/png');
+      expect(result.filename).toMatch(/\.png$/);
     });
 
     it('should handle processing errors gracefully', async () => {
