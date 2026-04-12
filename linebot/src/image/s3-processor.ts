@@ -105,16 +105,17 @@ export class S3ImageProcessor extends BaseImageProcessor {
         );
       }
 
-      // Convert stream to buffer
-      const chunks: Uint8Array[] = [];
-      const reader = response.Body.getReader();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
+      // AWS SDK v3 returns a Node.js Readable stream with a transformToByteArray helper
+      if (typeof response.Body.transformToByteArray === 'function') {
+        const bytes = await response.Body.transformToByteArray();
+        return Buffer.from(bytes);
       }
 
+      // Fallback: read as Node.js Readable stream
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+        chunks.push(chunk);
+      }
       return Buffer.concat(chunks);
     } catch (error) {
       if (error instanceof ProcessingError) {

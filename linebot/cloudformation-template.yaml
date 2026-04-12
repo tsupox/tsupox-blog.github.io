@@ -143,6 +143,10 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
+                  - s3:ListBucket
+                Resource: !GetAtt ImageBucket.Arn
+              - Effect: Allow
+                Action:
                   - s3:PutObject
                   - s3:PutObjectTagging
                   - s3:GetObject

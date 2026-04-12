@@ -35,7 +35,7 @@ export function loadConfig(): Config {
     github: {
       token: process.env.GITHUB_TOKEN!,
       owner: process.env.GITHUB_OWNER!,
-      repo: process.env.GITHUB_REPO!,
+      repo: process.env.GITHUB_REPO!.replace(/\.git$/, ''),
     },
     blog: {
       baseUrl: process.env.BLOG_BASE_URL!,
