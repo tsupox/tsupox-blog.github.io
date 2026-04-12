@@ -7,6 +7,7 @@ import { SessionStorage } from '../session/storage';
 import { ConversationFlow } from './flow';
 import { MessageProcessor } from './processor';
 import { LineApiClient, LineReplyMessage } from '../line/client';
+import { getUserMessage, logError } from '../errors';
 
 export class ConversationManager {
   private flow: ConversationFlow;
@@ -29,11 +30,13 @@ export class ConversationManager {
     message: LineMessage,
     replyToken: string
   ): Promise<void> {
+    let currentStep: string | undefined;
     try {
       console.log(`Processing message for user ${userId}:`, message);
 
       // Get current conversation state
       let currentState = await this.getCurrentState(userId);
+      currentStep = currentState.step;
 
       // Process the message based on current state
       const { nextState, responseMessage } = await this.processor.processMessage(
@@ -55,14 +58,15 @@ export class ConversationManager {
 
       console.log(`Message processed successfully for user ${userId}, new state: ${currentState.step}`);
     } catch (error) {
-      console.error(`Error processing message for user ${userId}:`, error);
+      // Structured error logging with classification
+      logError(error, userId, { step: currentStep, messageType: message.type });
 
-      // Send error message to user
-      const errorMessage = this.getErrorMessage(error);
+      // Send user-friendly error message
+      const errorMessage = getUserMessage(error);
       try {
         await this.lineClient.replyMessage(replyToken, this.createTextMessages(errorMessage));
       } catch (replyError) {
-        console.error('Failed to send error message to user:', replyError);
+        logError(replyError, userId, { context: 'failed_to_send_error_reply' });
       }
 
       throw error;
@@ -133,28 +137,6 @@ export class ConversationManager {
       console.error(`Error cancelling conversation for user ${userId}:`, error);
       throw error;
     }
-  }
-
-  /**
-   * Get user-friendly error message
-   */
-  private getErrorMessage(error: unknown): string {
-    if (error instanceof Error) {
-      // Check for specific error types and provide appropriate messages
-      if (error.message.includes('validation')) {
-        return 'すみません、入力内容に問題があります。もう一度お試しください。';
-      }
-
-      if (error.message.includes('network') || error.message.includes('timeout')) {
-        return 'ネットワークエラーが発生しました。しばらく待ってからもう一度お試しください。';
-      }
-
-      if (error.message.includes('storage') || error.message.includes('session')) {
-        return 'セッション管理でエラーが発生しました。「投稿作成」と送信して最初からやり直してください。';
-      }
-    }
-
-    return 'すみません、エラーが発生しました。「投稿作成」と送信して最初からやり直してください。';
   }
 
   /**

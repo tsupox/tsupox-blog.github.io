@@ -22,14 +22,6 @@ export class ConversationFlow {
         ConversationStep.WAITING_TITLE
       ],
       [ConversationStep.WAITING_TITLE]: [
-        ConversationStep.WAITING_SLUG,
-        ConversationStep.IDLE // Cancel
-      ],
-      [ConversationStep.WAITING_SLUG]: [
-        ConversationStep.WAITING_DATE,
-        ConversationStep.IDLE // Cancel
-      ],
-      [ConversationStep.WAITING_DATE]: [
         ConversationStep.WAITING_CONTENT,
         ConversationStep.IDLE // Cancel
       ],
@@ -59,9 +51,7 @@ export class ConversationFlow {
   getNextStep(currentStep: ConversationStep): ConversationStep | null {
     const flowOrder: Record<ConversationStep, ConversationStep | null> = {
       [ConversationStep.IDLE]: ConversationStep.WAITING_TITLE,
-      [ConversationStep.WAITING_TITLE]: ConversationStep.WAITING_SLUG,
-      [ConversationStep.WAITING_SLUG]: ConversationStep.WAITING_DATE,
-      [ConversationStep.WAITING_DATE]: ConversationStep.WAITING_CONTENT,
+      [ConversationStep.WAITING_TITLE]: ConversationStep.WAITING_CONTENT,
       [ConversationStep.WAITING_CONTENT]: ConversationStep.WAITING_IMAGE,
       [ConversationStep.WAITING_IMAGE]: ConversationStep.WAITING_TAGS,
       [ConversationStep.WAITING_TAGS]: ConversationStep.CONFIRMING,
@@ -112,8 +102,6 @@ export class ConversationFlow {
   isConversationComplete(state: ConversationState): boolean {
     return state.step === ConversationStep.CONFIRMING &&
            !!state.data.title &&
-           !!state.data.slug &&
-           !!state.data.postDate &&
            !!state.data.content &&
            !!state.data.imageUrl &&
            state.data.tags.length > 0;
@@ -133,12 +121,10 @@ export class ConversationFlow {
     const requirements: Record<ConversationStep, string[]> = {
       [ConversationStep.IDLE]: [],
       [ConversationStep.WAITING_TITLE]: [],
-      [ConversationStep.WAITING_SLUG]: ['title'],
-      [ConversationStep.WAITING_DATE]: ['title', 'slug'],
-      [ConversationStep.WAITING_CONTENT]: ['title', 'slug', 'postDate'],
-      [ConversationStep.WAITING_IMAGE]: ['title', 'slug', 'postDate', 'content'],
-      [ConversationStep.WAITING_TAGS]: ['title', 'slug', 'postDate', 'content', 'imageUrl'],
-      [ConversationStep.CONFIRMING]: ['title', 'slug', 'postDate', 'content', 'imageUrl', 'tags']
+      [ConversationStep.WAITING_CONTENT]: ['title'],
+      [ConversationStep.WAITING_IMAGE]: ['title', 'content'],
+      [ConversationStep.WAITING_TAGS]: ['title', 'content', 'imageUrl'],
+      [ConversationStep.CONFIRMING]: ['title', 'content', 'imageUrl', 'tags']
     };
 
     return requirements[step] || [];
@@ -174,8 +160,6 @@ export class ConversationFlow {
     const stepOrder = [
       ConversationStep.IDLE,
       ConversationStep.WAITING_TITLE,
-      ConversationStep.WAITING_SLUG,
-      ConversationStep.WAITING_DATE,
       ConversationStep.WAITING_CONTENT,
       ConversationStep.WAITING_IMAGE,
       ConversationStep.WAITING_TAGS,
@@ -195,8 +179,6 @@ export class ConversationFlow {
     const displayNames: Record<ConversationStep, string> = {
       [ConversationStep.IDLE]: '待機中',
       [ConversationStep.WAITING_TITLE]: 'タイトル入力',
-      [ConversationStep.WAITING_SLUG]: 'ファイル名入力',
-      [ConversationStep.WAITING_DATE]: '日付入力',
       [ConversationStep.WAITING_CONTENT]: '本文入力',
       [ConversationStep.WAITING_IMAGE]: '画像送信',
       [ConversationStep.WAITING_TAGS]: 'タグ選択',

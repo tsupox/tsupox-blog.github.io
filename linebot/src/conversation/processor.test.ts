@@ -16,7 +16,9 @@ jest.mock('../image', () => ({
       filename: 'test-image.jpeg',
       mimeType: 'image/jpeg',
       size: 1024
-    })
+    }),
+    downloadFromTempStorage: jest.fn().mockResolvedValue(Buffer.from('test-image-data')),
+    cleanupTempStorage: jest.fn().mockResolvedValue(undefined),
   }))
 }));
 
@@ -24,6 +26,16 @@ jest.mock('../line/client', () => ({
   LineApiClient: jest.fn().mockImplementation(() => ({
     downloadImage: jest.fn().mockResolvedValue(Buffer.from('test-image-data'))
   }))
+}));
+
+jest.mock('../github/client', () => ({
+  GitHubApiClient: jest.fn().mockImplementation(() => ({
+    commitMultipleFiles: jest.fn().mockResolvedValue('abc123sha'),
+  }))
+}));
+
+jest.mock('../errors', () => ({
+  logError: jest.fn(),
 }));
 
 describe('MessageProcessor', () => {
@@ -37,6 +49,16 @@ describe('MessageProcessor', () => {
         availableTags: ['タグ1', 'タグ2', 'タグ3'],
         imageBasePath: '/images',
         categories: ['日記']
+      },
+      github: {
+        token: 'test-token',
+        owner: 'test-owner',
+        repo: 'test-repo',
+      },
+      imageStorage: {
+        type: 's3',
+        bucketName: 'test-bucket',
+        region: 'us-east-1'
       }
     } as Config;
 
@@ -248,16 +270,27 @@ describe('MessageProcessor', () => {
   });
 
   describe('confirmation', () => {
-    it('should handle positive confirmation', async () => {
+    it('should publish post and include success message with blog URL and delay explanations', async () => {
       const message = { type: 'text' as const, text: 'はい' };
       const state = createIdleState();
       state.step = ConversationStep.CONFIRMING;
+      state.data = {
+        title: 'テスト投稿',
+        content: 'テスト本文',
+        imageUrl: 'temp-storage-key',
+        imagePath: 'source/images/2024/01/test-image.jpeg',
+        tags: ['タグ1'],
+      };
 
       const result = await processor.processMessage(message, state, 'user123');
 
       expect(result.nextState?.step).toBe(ConversationStep.IDLE);
-      expect(result.responseMessage).toContain('投稿を公開しました');
+      // Requirement 6.1: ブログURLを含む
       expect(result.responseMessage).toContain(mockConfig.blog.baseUrl);
+      // Requirement 9.1: ページ生成に数分かかる旨
+      expect(result.responseMessage).toContain('数分');
+      // Requirement 9.2: カスタムドメイン反映遅延
+      expect(result.responseMessage).toContain('カスタムドメイン');
     });
 
     it('should handle negative confirmation', async () => {
@@ -280,6 +313,31 @@ describe('MessageProcessor', () => {
 
       expect(result.nextState).toBeUndefined();
       expect(result.responseMessage).toContain('「はい」または「いいえ」で回答してください');
+    });
+
+    it('should return error message when GitHub commit fails', async () => {
+      // Override the mock to simulate failure
+      const { GitHubApiClient } = require('../github/client');
+      GitHubApiClient.mockImplementation(() => ({
+        commitMultipleFiles: jest.fn().mockRejectedValue(new Error('GitHub API error')),
+      }));
+      // Re-create processor with failing mock
+      const failProcessor = new MessageProcessor(mockConfig);
+
+      const message = { type: 'text' as const, text: 'はい' };
+      const state = createIdleState();
+      state.step = ConversationStep.CONFIRMING;
+      state.data = {
+        title: 'テスト投稿',
+        content: 'テスト本文',
+        tags: ['タグ1'],
+      };
+
+      const result = await failProcessor.processMessage(message, state, 'user123');
+
+      // Should not transition state on error
+      expect(result.nextState).toBeUndefined();
+      expect(result.responseMessage).toContain('エラーが発生しました');
     });
   });
 
@@ -304,6 +362,98 @@ describe('MessageProcessor', () => {
       const result = await processor.processMessage(message, state, 'user123');
 
       expect(result.responseMessage).toContain('投稿を作成するには「投稿作成」と送信してください');
+    });
+  });
+
+  describe('post-publish confirmation flow', () => {
+    it('should return blog URL when 確認 keyword is sent after publishing', async () => {
+      const message = { type: 'text' as const, text: '確認' };
+      const state = createIdleState();
+      state.lastPublishedUrl = 'https://test-blog.com';
+      state.lastPublishedAt = new Date();
+
+      const result = await processor.processMessage(message, state, 'user123');
+
+      expect(result.responseMessage).toContain('https://test-blog.com');
+      expect(result.responseMessage).toContain('投稿先URL');
+    });
+
+    it('should return blog URL when URL keyword is sent after publishing', async () => {
+      const message = { type: 'text' as const, text: 'url' };
+      const state = createIdleState();
+      state.lastPublishedUrl = 'https://test-blog.com';
+
+      const result = await processor.processMessage(message, state, 'user123');
+
+      expect(result.responseMessage).toContain('https://test-blog.com');
+    });
+
+    it('should explain page generation delay when 見られない is sent after publishing', async () => {
+      const message = { type: 'text' as const, text: '見られない' };
+      const state = createIdleState();
+      state.lastPublishedUrl = 'https://test-blog.com';
+      state.lastPublishedAt = new Date();
+
+      const result = await processor.processMessage(message, state, 'user123');
+
+      expect(result.responseMessage).toContain('GitHub Actions');
+      expect(result.responseMessage).toContain('数分');
+      expect(result.responseMessage).toContain('https://test-blog.com');
+    });
+
+    it('should explain page generation delay when 表示されない is sent after publishing', async () => {
+      const message = { type: 'text' as const, text: '表示されない' };
+      const state = createIdleState();
+      state.lastPublishedUrl = 'https://test-blog.com';
+
+      const result = await processor.processMessage(message, state, 'user123');
+
+      expect(result.responseMessage).toContain('GitHub Actions');
+      expect(result.responseMessage).toContain('数分');
+    });
+
+    it('should show default guidance when 確認 is sent without lastPublishedUrl', async () => {
+      const message = { type: 'text' as const, text: '確認' };
+      const state = createIdleState();
+
+      const result = await processor.processMessage(message, state, 'user123');
+
+      expect(result.responseMessage).toContain('投稿を作成するには「投稿作成」と送信してください');
+    });
+
+    it('should show default guidance when 見られない is sent without lastPublishedUrl', async () => {
+      const message = { type: 'text' as const, text: '見られない' };
+      const state = createIdleState();
+
+      const result = await processor.processMessage(message, state, 'user123');
+
+      expect(result.responseMessage).toContain('投稿を作成するには「投稿作成」と送信してください');
+    });
+
+    it('should preserve lastPublishedUrl and lastPublishedAt in state after successful publish', async () => {
+      // Re-create processor to ensure clean mocks (previous test may override GitHubApiClient)
+      const { GitHubApiClient } = require('../github/client');
+      GitHubApiClient.mockImplementation(() => ({
+        commitMultipleFiles: jest.fn().mockResolvedValue('abc123sha'),
+      }));
+      const freshProcessor = new MessageProcessor(mockConfig);
+
+      const message = { type: 'text' as const, text: 'はい' };
+      const state = createIdleState();
+      state.step = ConversationStep.CONFIRMING;
+      state.data = {
+        title: 'テスト投稿',
+        content: 'テスト本文',
+        imageUrl: 'temp-storage-key',
+        imagePath: 'source/images/2024/01/test-image.jpeg',
+        tags: ['タグ1'],
+      };
+
+      const result = await freshProcessor.processMessage(message, state, 'user123');
+
+      expect(result.nextState?.step).toBe(ConversationStep.IDLE);
+      expect(result.nextState?.lastPublishedUrl).toBe(mockConfig.blog.baseUrl);
+      expect(result.nextState?.lastPublishedAt).toBeInstanceOf(Date);
     });
   });
 });

@@ -1,5 +1,6 @@
 /**
- * GitHub module exports
+ * GitHub integration module
  */
-
-export { GitHubClient, CommitOptions } from './client';
+export { GitHubApiClient, GitHubManager } from './client';
+export { generateCommitMessage } from './commit-message';
+export { fetchExistingTags, extractTagsFromFrontMatter } from './tag-extractor';

@@ -17,8 +17,9 @@ export interface SessionStorage {
 
   /**
    * Reset session to IDLE state (keeps session but clears data)
+   * Optionally preserves lastPublishedUrl and lastPublishedAt for post-publish confirmation flow
    */
-  resetToIdle(userId: string): Promise<void>;
+  resetToIdle(userId: string, preserveFields?: { lastPublishedUrl?: string; lastPublishedAt?: Date }): Promise<void>;
 
   /**
    * Delete session completely

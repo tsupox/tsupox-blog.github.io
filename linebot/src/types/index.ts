@@ -23,8 +23,6 @@ export interface LineMessage {
 export enum ConversationStep {
   IDLE = 'idle',
   WAITING_TITLE = 'waiting_title',
-  WAITING_SLUG = 'waiting_slug',
-  WAITING_DATE = 'waiting_date',
   WAITING_CONTENT = 'waiting_content',
   WAITING_IMAGE = 'waiting_image',
   WAITING_TAGS = 'waiting_tags',
@@ -33,8 +31,6 @@ export enum ConversationStep {
 
 export interface PostData {
   title?: string;
-  slug?: string;
-  postDate?: string; // YYYY-MM-DD format
   content?: string;
   imageUrl?: string;
   imagePath?: string;
@@ -46,6 +42,8 @@ export interface ConversationState {
   data: PostData;
   createdAt: Date;
   updatedAt: Date;
+  lastPublishedUrl?: string;
+  lastPublishedAt?: Date;
 }
 
 // Image Processing Types
