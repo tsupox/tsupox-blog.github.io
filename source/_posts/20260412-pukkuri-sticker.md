@@ -17,4 +17,4 @@ sitemap: true
 
 試作品貼るとこなくてエアコンのリモコンに貼りました。
 
-![](/images/2026/04/2026-04-12T06-25-14-750Z-siql13.jpeg)
+![](/images/2026/04/20260412-pukkuri-sticker.jpg)
