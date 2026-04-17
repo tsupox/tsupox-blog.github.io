@@ -146,7 +146,7 @@ sitemap:
 ## Docs: https://hexo.io/docs/one-command-deployment
 deploy:
   type: git
-  repo: git@github.com:tsupox/tsupox-blog.github.io.git
+  repo: https://github.com/tsupox/tsupox-blog.github.io.git
   branch: gh-pages
   message: "Site updated: {{ now('yyyy-MM-dd HH:mm:ss') }}"
 
